@@ -49,7 +49,9 @@ backend/
 │           ├── users.py        # User CRUD (Admin-only)
 │           ├── categories.py   # Category CRUD (any authenticated user)
 │           ├── items.py        # Item CRUD (any authenticated user)
-│           └── stock.py        # Stock CRUD (any authenticated user)
+│           ├── stock.py        # Stock CRUD (any authenticated user)
+│           ├── carts.py        # Cart CRUD (any authenticated user)
+│           └── daily_accounts.py # Daily account closing (any authenticated user)
 │
 ├── core/
 │   ├── config.py               # App settings (pydantic-settings)
@@ -67,28 +69,40 @@ backend/
 │   ├── token.py                # RefreshToken dataclass
 │   ├── category.py             # Category dataclass
 │   ├── item.py                 # Item dataclass
-│   └── stock.py                # StockEntry dataclass
+│   ├── stock.py                # StockEntry dataclass
+│   ├── cart.py                 # Cart dataclass
+│   ├── cart_item.py            # CartItem dataclass
+│   ├── daily_account.py        # DailyAccount dataclass
+│   └── daily_account_item.py   # DailyAccountItem dataclass
 │
 ├── schemas/
 │   ├── user.py                 # Pydantic request/response schemas for User
 │   ├── token.py                # Pydantic schemas for Token payloads
 │   ├── category.py             # Pydantic schemas for Category
 │   ├── item.py                 # Pydantic schemas for Item
-│   └── stock.py                # Pydantic schemas for StockEntry
+│   ├── stock.py                # Pydantic schemas for StockEntry
+│   ├── cart.py                 # Pydantic schemas for Cart
+│   └── daily_account.py        # Pydantic schemas for DailyAccount
 │
 ├── repositories/
 │   ├── user_repository.py      # All SQL for the `users` table
 │   ├── token_repository.py     # All SQL for the `refresh_tokens` table
 │   ├── category_repository.py  # All SQL for the `categories` table
 │   ├── item_repository.py      # All SQL for the `items` table
-│   └── stock_repository.py     # All SQL for the `stock_entries` table
+│   ├── stock_repository.py     # All SQL for the `stock_entries` table
+│   ├── cart_repository.py      # All SQL for the `carts` table
+│   ├── cart_item_repository.py # All SQL for the `cart_items` table
+│   ├── daily_account_repository.py      # All SQL for the `daily_accounts` table
+│   └── daily_account_item_repository.py # All SQL for the `daily_account_items` table
 │
 └── services/
     ├── auth_service.py         # Login, token refresh, logout business logic
     ├── user_service.py         # User registration, update, delete logic
     ├── category_service.py     # Category CRUD business logic
     ├── item_service.py         # Item CRUD business logic
-    └── stock_service.py        # Stock CRUD business logic
+    ├── stock_service.py        # Stock CRUD business logic
+    ├── cart_service.py         # Cart CRUD business logic
+    └── daily_account_service.py # Daily account closing business logic
 ```
 
 ---
@@ -280,6 +294,38 @@ Items represent products that can be stocked and sold.
 - Each item can only have **one** stock entry — adding the same `item_id` twice returns **409 Conflict**.
 - To change the quantity, use `PATCH /stock/{item_id}`.
 
+### Carts – `/api/v1/carts`
+
+| Method | Path | Who can call | Description |
+|---|---|---|---|
+| `POST` | `/` | Any authenticated user | Create a new cart |
+| `GET` | `/{cart_id}` | Any authenticated user | Get cart summary (items + totals) |
+| `POST` | `/{cart_id}/items` | Any authenticated user | Add item to cart (error if exists) |
+| `PATCH` | `/{cart_id}/items/{cart_item_id}` | Any authenticated user | Update cart item quantity (0 removes) |
+| `DELETE` | `/{cart_id}/items` | Any authenticated user | Clear all cart items |
+
+**Cart rules:**
+- Items must exist and be in stock before adding to a cart.
+- Requested quantities cannot exceed available stock.
+- Cart totals include discounts and taxes calculated from item rates.
+- Adding an item that already exists returns 409 Conflict; use PATCH to update quantity.
+- Setting quantity to 0 via PATCH removes the item from the cart.
+
+### Daily Accounts – `/api/v1/daily-accounts`
+
+| Method | Path | Who can call | Description |
+|---|---|---|---|
+| `POST` | `/close` | Any authenticated user | Close today's account |
+| `GET` | `/` | Any authenticated user | List recent daily accounts |
+| `GET` | `/{account_id}` | Any authenticated user | Get daily account summary |
+| `GET` | `/by-date/{date}` | Any authenticated user | Get daily account by date |
+
+**Daily Account rules:**
+- Closing an account aggregates all carts created today.
+- Each day can only have one account, and it can only be closed once.
+- Account totals include all items with their discounts and taxes.
+- Cannot close an account if no carts exist for today.
+
 Interactive API docs are available at **`/docs`** (Swagger UI) and **`/redoc`**.
 
 ---
@@ -368,6 +414,10 @@ The application uses **SQLite 3** via Python's built-in `sqlite3` module.
 | `categories` | Item categories (e.g., "Fresh Produce", "Dairy") |
 | `items` | Products/SKUs with pricing and inventory info |
 | `stock_entries` | Current quantity on hand per item (one row per item) |
+| `carts` | Shopping carts created by employees |
+| `cart_items` | Items and quantities per cart |
+| `daily_accounts` | Closed daily account summaries |
+| `daily_account_items` | Items aggregated in each daily account |
 
 ### `items` Table – Key Columns
 
@@ -400,6 +450,68 @@ The application uses **SQLite 3** via Python's built-in `sqlite3` module.
 | `updated_by` | INTEGER | Foreign key to `users` |
 | `created_at` | TEXT | ISO timestamp |
 | `updated_at` | TEXT | ISO timestamp |
+
+### `carts` Table – Key Columns
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `created_by` | INTEGER | Foreign key to `users` |
+| `updated_by` | INTEGER | Foreign key to `users` |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+### `cart_items` Table – Key Columns
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `cart_id` | INTEGER | Foreign key to `carts` |
+| `item_id` | INTEGER | Foreign key to `items` |
+| `quantity` | REAL | Quantity of the item in the cart |
+| `created_by` | INTEGER | Foreign key to `users` |
+| `updated_by` | INTEGER | Foreign key to `users` |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+### `daily_accounts` Table – Key Columns
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `account_date` | TEXT | Date of the account (unique) |
+| `subtotal` | REAL | Total before discounts and taxes |
+| `discount_total` | REAL | Total discounts applied |
+| `tax_total` | REAL | Total taxes applied |
+| `total` | REAL | Final total after discounts and taxes |
+| `carts_count` | INTEGER | Number of carts included |
+| `items_count` | INTEGER | Number of unique items sold |
+| `is_closed` | INTEGER | `1` if closed, `0` if open |
+| `closed_at` | TEXT | ISO timestamp when closed |
+| `closed_by` | INTEGER | Foreign key to `users` |
+| `created_by` | INTEGER | Foreign key to `users` |
+| `updated_by` | INTEGER | Foreign key to `users` |
+| `created_at` | TEXT | ISO timestamp |
+| `updated_at` | TEXT | ISO timestamp |
+
+### `daily_account_items` Table – Key Columns
+
+| Column | Type | Description |
+|---|---|---|
+| `id` | INTEGER | Primary key |
+| `account_id` | INTEGER | Foreign key to `daily_accounts` |
+| `item_id` | INTEGER | Foreign key to `items` |
+| `item_name` | TEXT | Name of the item at time of closing |
+| `sku` | TEXT | SKU at time of closing |
+| `quantity` | REAL | Total quantity sold |
+| `unit_price` | REAL | Price per unit at time of closing |
+| `discount_rate` | REAL | Discount percentage |
+| `tax_rate` | REAL | Tax percentage |
+| `line_subtotal` | REAL | Subtotal for this item |
+| `line_discount` | REAL | Discount amount |
+| `line_tax` | REAL | Tax amount |
+| `line_total` | REAL | Total for this item |
+| `created_at` | TEXT | ISO timestamp |
 
 ### `users` Table – Key Columns
 
@@ -435,6 +547,7 @@ On startup, the application automatically generates mock data for testing:
 
 - **7 Categories**: Fresh Produce, Dairy & Eggs, Bakery, Beverages, Meat & Seafood, Pantry, Snacks
 - **32 Items**: Realistic products with SKUs, barcodes, prices, and tax rates
+- **3 Carts**: Sample carts populated with a few stocked items
 
 This data is created using the first user (typically the admin) as the creator.
 The seeder is **idempotent** – it will not create duplicates if run again.

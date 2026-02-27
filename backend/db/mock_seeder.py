@@ -13,6 +13,8 @@ from backend.repositories.category_repository import CategoryRepository
 from backend.repositories.item_repository import ItemRepository
 from backend.repositories.stock_repository import StockRepository
 from backend.repositories.user_repository import UserRepository
+from backend.repositories.cart_repository import CartRepository
+from backend.repositories.cart_item_repository import CartItemRepository
 
 logger = logging.getLogger(__name__)
 
@@ -107,6 +109,8 @@ def seed_mock_data() -> None:
         category_repo = CategoryRepository(conn)
         item_repo = ItemRepository(conn)
         stock_repo = StockRepository(conn)
+        cart_repo = CartRepository(conn)
+        cart_item_repo = CartItemRepository(conn)
 
         # Get the first user (admin) to use as creator
         users = user_repo.list_all()
@@ -186,6 +190,31 @@ def seed_mock_data() -> None:
             stock_count += 1
 
         logger.info("Mock seeder: Created %s new stock entries", stock_count)
+
+        # ── Carts ────────────────────────────────────────────────────────────
+        carts = []
+        for _ in range(3):
+            carts.append(cart_repo.create(created_by=creator_id))
+        logger.info("Mock seeder: Created %s carts", len(carts))
+
+        if carts:
+            available_items = item_repo.list_all()
+            for cart in carts:
+                if not available_items:
+                    continue
+                for item in random.sample(available_items, k=min(3, len(available_items))):
+                    stock_entry = stock_repo.get_by_item_id(item.id)
+                    if not stock_entry or stock_entry.quantity <= 0:
+                        continue
+                    max_qty = max(1, int(min(5, stock_entry.quantity)))
+                    cart_item_repo.create(
+                        cart_id=cart.id,
+                        item_id=item.id,
+                        quantity=random.randint(1, max_qty),
+                        created_by=creator_id,
+                    )
+            logger.info("Mock seeder: Added items to carts")
+
         conn.commit()
 
     except Exception as e:
