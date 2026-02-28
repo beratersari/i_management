@@ -31,6 +31,7 @@ def seed_admin() -> None:
     Insert the default admin user if it does not already exist.
     Safe to call on every startup – it is a no-op when the user is present.
     """
+    logger.info("Seeder: ensuring default admin user")
     conn = get_connection()
     try:
         existing = conn.execute(

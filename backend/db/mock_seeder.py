@@ -15,6 +15,7 @@ from backend.repositories.stock_repository import StockRepository
 from backend.repositories.user_repository import UserRepository
 from backend.repositories.cart_repository import CartRepository
 from backend.repositories.cart_item_repository import CartItemRepository
+from backend.repositories.menu_repository import MenuRepository
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +86,7 @@ MOCK_ITEMS = {
 
 def _generate_sku(category_name: str, item_name: str, index: int) -> str:
     """Generate a unique SKU for an item."""
+    logger.trace("Generating SKU for item %s", item_name)
     cat_prefix = "".join(word[0].upper() for word in category_name.split() if word)
     item_prefix = "".join(word[0].upper() for word in item_name.split()[:2])
     return f"{cat_prefix}-{item_prefix}-{index:04d}"
@@ -92,6 +94,7 @@ def _generate_sku(category_name: str, item_name: str, index: int) -> str:
 
 def _generate_barcode(sku: str) -> str:
     """Generate a fake barcode from SKU."""
+    logger.trace("Generating barcode for SKU=%s", sku)
     # Generate a 13-digit EAN-like barcode
     digits = "".join(str(ord(c) % 10) for c in sku)
     return (digits * 2)[:13]
@@ -103,6 +106,7 @@ def seed_mock_data() -> None:
     Uses the first available user as the creator (typically the admin).
     Safe to call multiple times – will skip already existing data.
     """
+    logger.info("Mock seeder: starting")
     conn = get_connection()
     try:
         user_repo = UserRepository(conn)
@@ -111,6 +115,7 @@ def seed_mock_data() -> None:
         stock_repo = StockRepository(conn)
         cart_repo = CartRepository(conn)
         cart_item_repo = CartItemRepository(conn)
+        menu_repo = MenuRepository(conn)
 
         # Get the first user (admin) to use as creator
         users = user_repo.list_all()
@@ -191,11 +196,37 @@ def seed_mock_data() -> None:
 
         logger.info("Mock seeder: Created %s new stock entries", stock_count)
 
+        # ── Menu items ───────────────────────────────────────────────────────
+        menu_count = 0
+        for item in item_repo.list_all():
+            if menu_repo.get_by_item_id(item.id):
+                logger.info("Mock seeder: Menu item for item id=%s already exists", item.id)
+                continue
+            menu_repo.add(
+                item_id=item.id,
+                display_name=item.name,
+                description=f"Menu listing for {item.name}",
+                allergens=None,
+                created_by=creator_id,
+            )
+            menu_count += 1
+
+        logger.info("Mock seeder: Created %s menu items", menu_count)
+
         # ── Carts ────────────────────────────────────────────────────────────
         carts = []
-        for _ in range(3):
-            carts.append(cart_repo.create(created_by=creator_id))
-        logger.info("Mock seeder: Created %s carts", len(carts))
+        desk_numbers = ["A01", "A02", "B01"]
+        for desk in desk_numbers:
+            # Check if a cart with this desk_number already exists
+            existing = cart_repo.get_by_desk_number(desk)
+            if existing:
+                logger.info("Mock seeder: Cart with desk_number '%s' already exists", desk)
+                carts.append(existing)
+                continue
+            cart = cart_repo.create(created_by=creator_id)
+            cart_repo.update_desk_number(cart.id, desk, creator_id)
+            carts.append(cart_repo.get_by_id(cart.id))
+        logger.info("Mock seeder: Created %s carts with desk numbers", len(carts))
 
         if carts:
             available_items = item_repo.list_all()

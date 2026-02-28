@@ -25,9 +25,19 @@ class Item:
     created_at: datetime
     updated_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized Item model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "Item":
         """Build an Item from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating Item from database row")
         return cls(
             id=row["id"],
             category_id=row["category_id"],

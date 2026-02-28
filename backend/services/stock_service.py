@@ -8,6 +8,7 @@ Business rules:
   - Any authenticated user can manage stock entries.
 """
 import sqlite3
+import logging
 
 from fastapi import HTTPException, status
 
@@ -17,9 +18,12 @@ from backend.repositories.item_repository import ItemRepository
 from backend.repositories.stock_repository import StockRepository
 from backend.schemas.stock import StockCreate, StockUpdate
 
+logger = logging.getLogger(__name__)
+
 
 class StockService:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing StockService")
         self._repo = StockRepository(conn)
         self._item_repo = ItemRepository(conn)
 
@@ -29,8 +33,10 @@ class StockService:
 
     def get_entry(self, item_id: int) -> StockEntry:
         """Return the stock entry for an item, or 404 if not yet stocked."""
+        logger.info("Fetching stock entry item_id=%s", item_id)
         entry = self._repo.get_by_item_id(item_id)
         if not entry:
+            logger.warning("Stock entry not found for item id=%s", item_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No stock entry found for item id={item_id}",
@@ -39,6 +45,7 @@ class StockService:
 
     def list_entries(self) -> list[StockEntry]:
         """Return all stock entries ordered by item_id."""
+        logger.info("Listing stock entries")
         return self._repo.list_all()
 
     def list_grouped_by_category(self) -> list[dict]:
@@ -46,6 +53,7 @@ class StockService:
         Return stocked items grouped by category (sorted by item name within
         each group).
         """
+        logger.info("Listing stock grouped by category")
         return self._repo.list_grouped_by_category()
 
     # ------------------------------------------------------------------
@@ -60,9 +68,11 @@ class StockService:
             404  – item does not exist.
             409  – item is already in stock (duplicate item_id).
         """
+        logger.info("Adding item to stock item_id=%s", data.item_id)
         # Verify the item exists
         item = self._item_repo.get_by_id(data.item_id)
         if not item:
+            logger.warning("Item id=%s not found for stock", data.item_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Item with id={data.item_id} not found",
@@ -71,6 +81,7 @@ class StockService:
         # Reject duplicates
         existing = self._repo.get_by_item_id(data.item_id)
         if existing:
+            logger.warning("Duplicate stock entry for item id=%s", data.item_id)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
@@ -80,11 +91,13 @@ class StockService:
                 ),
             )
 
-        return self._repo.add(
+        entry = self._repo.add(
             item_id=data.item_id,
             quantity=float(data.quantity),
             created_by=created_by.id,
         )
+        logger.info("Stock entry created id=%s", entry.id)
+        return entry
 
     # ------------------------------------------------------------------
     # Update
@@ -99,14 +112,17 @@ class StockService:
         Raises:
             404 – no stock entry found for the given item_id.
         """
+        logger.info("Updating stock entry item_id=%s", item_id)
         # Ensure the entry exists (raises 404 if not)
         self.get_entry(item_id)
 
-        return self._repo.update_quantity(  # type: ignore[return-value]
+        updated_entry = self._repo.update_quantity(  # type: ignore[return-value]
             item_id=item_id,
             quantity=float(data.quantity),
             updated_by=updated_by.id,
         )
+        logger.info("Stock entry updated item_id=%s", item_id)
+        return updated_entry
 
     # ------------------------------------------------------------------
     # Delete
@@ -119,8 +135,11 @@ class StockService:
         Raises:
             404 – no stock entry found for the given item_id.
         """
+        logger.info("Removing stock entry item_id=%s", item_id)
         if not self._repo.delete(item_id):
+            logger.warning("Stock entry not found for item id=%s", item_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"No stock entry found for item id={item_id}",
             )
+        logger.info("Stock entry removed item_id=%s", item_id)

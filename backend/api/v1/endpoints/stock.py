@@ -8,6 +8,7 @@ Stock management endpoints (any authenticated user can access):
   DELETE /stock/{item_id}              – Remove an item from stock
 """
 from fastapi import APIRouter, Depends, status
+import logging
 
 from backend.core.dependencies import db_dependency, get_current_active_user
 from backend.models.user import User
@@ -18,6 +19,8 @@ from backend.schemas.stock import (
     StockCategoryGroup,
 )
 from backend.services.stock_service import StockService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/stock", tags=["Stock"])
 
@@ -39,6 +42,7 @@ def add_to_stock(
     - Each item can only be added once (duplicate `item_id` → **409 Conflict**).
     - To change the quantity later, use **PATCH /stock/{item_id}**.
     """
+    logger.info("Adding item to stock item_id=%s", data.item_id)
     service = StockService(conn)
     return service.add_to_stock(data, created_by=current_user)
 
@@ -53,6 +57,7 @@ def list_stock(
     _: User = Depends(get_current_active_user),
 ):
     """Return a flat list of all stock entries ordered by item_id."""
+    logger.info("Listing stock entries")
     service = StockService(conn)
     return service.list_entries()
 
@@ -70,6 +75,7 @@ def list_stock_by_category(
     Return all stocked items grouped by their category.
     Within each category, items are sorted alphabetically by name.
     """
+    logger.info("Listing stock grouped by category")
     service = StockService(conn)
     return service.list_grouped_by_category()
 
@@ -85,6 +91,7 @@ def get_stock_entry(
     _: User = Depends(get_current_active_user),
 ):
     """Retrieve the stock entry for the given item ID."""
+    logger.info("Fetching stock entry item_id=%s", item_id)
     service = StockService(conn)
     return service.get_entry(item_id)
 
@@ -104,6 +111,7 @@ def update_stock(
     Update the quantity on hand for a stocked item.
     The item must already have a stock entry (use **POST /stock** to create one first).
     """
+    logger.info("Updating stock entry item_id=%s", item_id)
     service = StockService(conn)
     return service.update_quantity(item_id, data, updated_by=current_user)
 
@@ -119,5 +127,6 @@ def remove_from_stock(
     _: User = Depends(get_current_active_user),
 ):
     """Remove the stock entry for the given item entirely."""
+    logger.info("Removing stock entry item_id=%s", item_id)
     service = StockService(conn)
     service.remove_from_stock(item_id)

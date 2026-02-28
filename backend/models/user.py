@@ -28,9 +28,19 @@ class User:
     full_name: Optional[str] = None
     deleted_at: Optional[datetime] = None
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized User model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "User":
         """Build a User from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating User from database row")
         deleted_at_raw = row["deleted_at"]
         return cls(
             id=row["id"],

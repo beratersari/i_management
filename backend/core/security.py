@@ -3,11 +3,14 @@ Security utilities: password hashing and JWT creation/verification.
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Any
+import logging
 
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from backend.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Password hashing
@@ -18,11 +21,13 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def hash_password(plain_password: str) -> str:
     """Return the bcrypt hash of *plain_password*."""
+    logger.trace("Hashing user password")
     return pwd_context.hash(plain_password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Return True if *plain_password* matches *hashed_password*."""
+    logger.trace("Verifying password hash")
     return pwd_context.verify(plain_password, hashed_password)
 
 
@@ -48,11 +53,14 @@ def _create_token(
     }
     if extra_claims:
         payload.update(extra_claims)
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    token = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    logger.info("Issued %s token for subject=%s", token_type, subject)
+    return token
 
 
 def create_access_token(user_id: int, role: str) -> str:
     """Create a short-lived access token (15 minutes)."""
+    logger.trace("Creating access token for user id=%s", user_id)
     return _create_token(
         subject=str(user_id),
         role=role,
@@ -63,6 +71,7 @@ def create_access_token(user_id: int, role: str) -> str:
 
 def create_refresh_token(user_id: int, role: str) -> str:
     """Create a long-lived refresh token (7 days)."""
+    logger.trace("Creating refresh token for user id=%s", user_id)
     return _create_token(
         subject=str(user_id),
         role=role,
@@ -78,4 +87,5 @@ def decode_token(token: str) -> dict:
     Raises:
         jose.JWTError: if the token is invalid or expired.
     """
+    logger.trace("Decoding JWT token")
     return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])

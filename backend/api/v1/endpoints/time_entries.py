@@ -12,6 +12,7 @@ Time entry management endpoints:
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status, HTTPException
+import logging
 
 from backend.core.dependencies import (
     db_dependency,
@@ -27,6 +28,8 @@ from backend.schemas.time_entry import (
     TimeEntryResponse,
 )
 from backend.services.time_entry_service import TimeEntryService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/time-entries", tags=["Time Entries"])
 
@@ -50,6 +53,7 @@ def create_time_entry(
     - **end_hour**: End time of the work shift (HH:MM, 24-hour format)
     - **notes**: Optional notes about the work session
     """
+    logger.info("Creating time entry for user id=%s", current_user.id)
     service = TimeEntryService(conn)
     return service.create_entry(data, current_user)
 
@@ -68,6 +72,7 @@ def list_my_entries(
     current_user: User = Depends(get_current_active_user),
 ):
     """Return all time entries for the current user."""
+    logger.info("Listing time entries for user id=%s", current_user.id)
     service = TimeEntryService(conn)
     return service.list_my_entries(current_user, status)
 
@@ -82,6 +87,7 @@ def list_pending_entries(
     _: User = Depends(require_admin_or_owner),
 ):
     """Return all pending time entries for review."""
+    logger.info("Listing pending time entries")
     service = TimeEntryService(conn)
     return service.list_pending_entries()
 
@@ -102,6 +108,11 @@ def list_entries_by_date_range(
     _: User = Depends(get_current_active_user),
 ):
     """Return time entries within a date range."""
+    logger.info(
+        "Listing time entries from %s to %s",
+        start_date,
+        end_date,
+    )
     service = TimeEntryService(conn)
     return service.list_entries_by_date_range(start_date, end_date, status)
 
@@ -117,6 +128,7 @@ def get_entry(
     _: User = Depends(get_current_active_user),
 ):
     """Return a specific time entry by ID."""
+    logger.info("Fetching time entry id=%s", entry_id)
     service = TimeEntryService(conn)
     return service.get_entry(entry_id)
 
@@ -137,6 +149,7 @@ def update_entry(
     
     Employees can only update their own entries, and only if the status is 'pending'.
     """
+    logger.info("Updating time entry id=%s", entry_id)
     service = TimeEntryService(conn)
     return service.update_entry(entry_id, data, current_user)
 
@@ -156,6 +169,7 @@ def delete_entry(
     
     Employees can only delete their own entries, and only if the status is 'pending'.
     """
+    logger.info("Deleting time entry id=%s", entry_id)
     service = TimeEntryService(conn)
     service.delete_entry(entry_id, current_user)
 
@@ -179,5 +193,6 @@ def review_entry(
     - **status**: Set to 'accepted' or 'rejected'
     - **rejection_reason**: Required if status is 'rejected'
     """
+    logger.info("Reviewing time entry id=%s", entry_id)
     service = TimeEntryService(conn)
     return service.review_entry(entry_id, data, current_user)

@@ -14,8 +14,18 @@ class RefreshToken:
     revoked: bool
     created_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized RefreshToken model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "RefreshToken":
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating RefreshToken from database row")
         return cls(
             id=row["id"],
             user_id=row["user_id"],

@@ -13,6 +13,7 @@ Daily account management endpoints:
 """
 from datetime import date
 from fastapi import APIRouter, Depends, Query, status
+import logging
 
 from backend.core.dependencies import (
     db_dependency,
@@ -28,6 +29,8 @@ from backend.schemas.daily_account import (
     CategorySalesResponse,
 )
 from backend.services.daily_account_service import DailyAccountService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/daily-accounts", tags=["Daily Accounts"])
 
@@ -47,6 +50,7 @@ def close_today(
     Aggregates all carts created today and calculates totals.
     Cannot close if already closed or if no carts exist for today.
     """
+    logger.info("Closing today's account")
     service = DailyAccountService(conn)
     return service.close_today(user=current_user)
 
@@ -62,6 +66,7 @@ def list_accounts(
     _: User = Depends(get_current_active_user),
 ):
     """Return a list of recent daily accounts, sorted by date descending."""
+    logger.info("Listing daily accounts limit=%s", limit)
     service = DailyAccountService(conn)
     return service.list_accounts(limit=limit)
 
@@ -77,6 +82,7 @@ def get_account_by_date(
     _: User = Depends(get_current_active_user),
 ):
     """Return a daily account summary for a specific date."""
+    logger.info("Fetching daily account by date=%s", account_date)
     service = DailyAccountService(conn)
     return service.get_summary(
         service.get_account_by_date(account_date).id
@@ -94,6 +100,7 @@ def get_account(
     _: User = Depends(get_current_active_user),
 ):
     """Return a daily account with all items and totals."""
+    logger.info("Fetching daily account id=%s", account_id)
     service = DailyAccountService(conn)
     return service.get_summary(account_id)
 
@@ -116,6 +123,7 @@ def open_account(
     """
     Reopen a closed daily account (admin or market_owner only).
     """
+    logger.info("Opening daily account id=%s", account_id)
     service = DailyAccountService(conn)
     return service.open_account(account_id, user=current_user)
 
@@ -135,6 +143,7 @@ def close_by_date(
     Close a specific date's daily account (admin or market_owner only).
     Aggregates all carts created on that date and calculates totals.
     """
+    logger.info("Closing daily account date=%s", account_date)
     service = DailyAccountService(conn)
     return service.close_by_date(account_date, user=current_user)
 
@@ -153,6 +162,7 @@ def open_by_date(
     """
     Reopen a specific date's daily account (admin or market_owner only).
     """
+    logger.info("Opening daily account date=%s", account_date)
     service = DailyAccountService(conn)
     return service.open_by_date(account_date, user=current_user)
 
@@ -177,6 +187,7 @@ def get_item_sales(
     Get sales statistics for a specific item within a date range.
     Example: How many bananas sold between 2024-01-01 and 2024-01-31
     """
+    logger.info("Fetching item sales item_id=%s", item_id)
     service = DailyAccountService(conn)
     return service.get_item_sales_by_date_range(item_id, start_date, end_date)
 
@@ -196,6 +207,7 @@ def get_top_sellers(
     """
     Get top selling items within a date range.
     """
+    logger.info("Fetching top sellers start_date=%s end_date=%s", start_date, end_date)
     service = DailyAccountService(conn)
     return service.get_top_sellers(start_date, end_date, limit)
 
@@ -214,5 +226,6 @@ def get_sales_by_category(
     """
     Get sales aggregated by category within a date range.
     """
+    logger.info("Fetching sales by category start_date=%s end_date=%s", start_date, end_date)
     service = DailyAccountService(conn)
     return service.get_sales_by_category(start_date, end_date)

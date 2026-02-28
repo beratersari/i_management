@@ -4,7 +4,11 @@ Pydantic schemas for User request/response validation.
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from datetime import datetime
 from typing import Optional
+import logging
+
 from backend.models.user import UserRole
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -21,9 +25,12 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
+        logger.trace("Validating password strength")
         if not any(c.isupper() for c in v):
+            logger.warning("Password missing uppercase letter")
             raise ValueError("Password must contain at least one uppercase letter")
         if not any(c.isdigit() for c in v):
+            logger.warning("Password missing digit")
             raise ValueError("Password must contain at least one digit")
         return v
 

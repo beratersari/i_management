@@ -5,12 +5,16 @@ All SQL for the `users` table lives here.
 import sqlite3
 from typing import Optional
 from datetime import datetime, timezone
+import logging
 
 from backend.models.user import User, UserRole
+
+logger = logging.getLogger(__name__)
 
 
 class UserRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing UserRepository")
         self._conn = conn
 
     # ------------------------------------------------------------------
@@ -19,6 +23,7 @@ class UserRepository:
 
     def get_by_id(self, user_id: int) -> Optional[User]:
         """Return a user regardless of deleted status (used internally)."""
+        logger.trace("Fetching user by id=%s", user_id)
         row = self._conn.execute(
             "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
@@ -26,6 +31,7 @@ class UserRepository:
 
     def get_active_by_id(self, user_id: int) -> Optional[User]:
         """Return a user only if they are not soft-deleted."""
+        logger.trace("Fetching active user by id=%s", user_id)
         row = self._conn.execute(
             "SELECT * FROM users WHERE id = ? AND is_deleted = 0", (user_id,)
         ).fetchone()
@@ -33,6 +39,7 @@ class UserRepository:
 
     def get_by_email(self, email: str) -> Optional[User]:
         """Return a non-deleted user by email."""
+        logger.trace("Fetching user by email=%s", email)
         row = self._conn.execute(
             "SELECT * FROM users WHERE email = ? AND is_deleted = 0", (email,)
         ).fetchone()
@@ -40,6 +47,7 @@ class UserRepository:
 
     def get_by_username(self, username: str) -> Optional[User]:
         """Return a non-deleted user by username."""
+        logger.trace("Fetching user by username=%s", username)
         row = self._conn.execute(
             "SELECT * FROM users WHERE username = ? AND is_deleted = 0", (username,)
         ).fetchone()
@@ -47,6 +55,7 @@ class UserRepository:
 
     def list_all(self, include_deleted: bool = False) -> list[User]:
         """List users; by default only non-deleted users are returned."""
+        logger.trace("Listing users include_deleted=%s", include_deleted)
         if include_deleted:
             rows = self._conn.execute("SELECT * FROM users").fetchall()
         else:
@@ -67,6 +76,7 @@ class UserRepository:
         role: UserRole,
         full_name: Optional[str] = None,
     ) -> User:
+        logger.info("Creating user record username=%s", username)
         cursor = self._conn.execute(
             """
             INSERT INTO users (email, username, full_name, hashed_password, role)
@@ -82,8 +92,10 @@ class UserRepository:
         Only non-None values in *fields* are applied.
         """
         if not fields:
+            logger.trace("No user fields to update id=%s", user_id)
             return self.get_by_id(user_id)
 
+        logger.info("Updating user record id=%s", user_id)
         fields["updated_at"] = datetime.now(tz=timezone.utc).isoformat()
         set_clause = ", ".join(f"{col} = ?" for col in fields)
         values = list(fields.values()) + [user_id]
@@ -97,6 +109,7 @@ class UserRepository:
         Mark the user as deleted without removing the row.
         Also deactivates the account and records the deletion timestamp.
         """
+        logger.info("Soft deleting user id=%s", user_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
             """
@@ -109,4 +122,5 @@ class UserRepository:
             """,
             (now, now, user_id),
         )
+        logger.info("Soft delete affected %s rows", cursor.rowcount)
         return cursor.rowcount > 0

@@ -5,6 +5,9 @@ from pydantic import BaseModel, Field, field_validator
 from datetime import datetime
 from decimal import Decimal
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -26,6 +29,7 @@ class ItemCreate(BaseModel):
     @field_validator("unit_price", "tax_rate", "discount_rate", mode="before")
     @classmethod
     def validate_decimal(cls, v):
+        logger.trace("Validating item decimal value")
         if v is None:
             return v
         return Decimal(str(v))
@@ -46,6 +50,7 @@ class ItemUpdate(BaseModel):
     @field_validator("unit_price", "tax_rate", "discount_rate", mode="before")
     @classmethod
     def validate_decimal(cls, v):
+        logger.trace("Validating item decimal value")
         if v is None:
             return v
         return Decimal(str(v))

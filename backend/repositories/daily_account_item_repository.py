@@ -5,12 +5,16 @@ All SQL for the `daily_account_items` table lives here.
 import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
+import logging
 
 from backend.models.daily_account_item import DailyAccountItem
+
+logger = logging.getLogger(__name__)
 
 
 class DailyAccountItemRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing DailyAccountItemRepository")
         self._conn = conn
 
     # ------------------------------------------------------------------
@@ -18,6 +22,7 @@ class DailyAccountItemRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, item_id: int) -> Optional[DailyAccountItem]:
+        logger.trace("Fetching daily account item id=%s", item_id)
         row = self._conn.execute(
             "SELECT * FROM daily_account_items WHERE id = ?",
             (item_id,),
@@ -25,6 +30,7 @@ class DailyAccountItemRepository:
         return DailyAccountItem.from_row(row) if row else None
 
     def list_by_account(self, account_id: int) -> list[DailyAccountItem]:
+        logger.trace("Listing daily account items account_id=%s", account_id)
         rows = self._conn.execute(
             "SELECT * FROM daily_account_items WHERE account_id = ? ORDER BY id",
             (account_id,),
@@ -50,6 +56,7 @@ class DailyAccountItemRepository:
         line_tax: float,
         line_total: float,
     ) -> DailyAccountItem:
+        logger.info("Creating daily account item account_id=%s item_id=%s", account_id, item_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
             """
@@ -79,16 +86,19 @@ class DailyAccountItemRepository:
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
     def delete_by_account(self, account_id: int) -> int:
+        logger.info("Deleting daily account items account_id=%s", account_id)
         cursor = self._conn.execute(
             "DELETE FROM daily_account_items WHERE account_id = ?",
             (account_id,),
         )
+        logger.info("Daily account items delete affected %s rows", cursor.rowcount)
         return cursor.rowcount
 
     def get_item_sales_by_date_range(
         self, item_id: int, start_date: str, end_date: str
     ) -> dict:
         """Get sales statistics for a specific item within a date range."""
+        logger.trace("Getting item sales item_id=%s", item_id)
         row = self._conn.execute(
             """
             SELECT 
@@ -105,8 +115,9 @@ class DailyAccountItemRepository:
             """,
             (item_id, start_date, end_date),
         ).fetchone()
-        
+
         if not row or row["total_quantity"] is None:
+            logger.trace("No sales data for item_id=%s", item_id)
             return {
                 "item_id": item_id,
                 "total_quantity": 0,
@@ -114,7 +125,7 @@ class DailyAccountItemRepository:
                 "days_sold": 0,
                 "avg_unit_price": 0.0,
             }
-        
+
         return {
             "item_id": item_id,
             "total_quantity": row["total_quantity"],
@@ -127,6 +138,7 @@ class DailyAccountItemRepository:
         self, start_date: str, end_date: str, limit: int = 10
     ) -> list[dict]:
         """Get top selling items within a date range."""
+        logger.trace("Getting top sellers start_date=%s end_date=%s", start_date, end_date)
         rows = self._conn.execute(
             """
             SELECT 
@@ -147,7 +159,7 @@ class DailyAccountItemRepository:
             """,
             (start_date, end_date, limit),
         ).fetchall()
-        
+
         return [
             {
                 "item_id": row["item_id"],
@@ -164,6 +176,7 @@ class DailyAccountItemRepository:
         self, start_date: str, end_date: str
     ) -> list[dict]:
         """Get sales aggregated by category within a date range."""
+        logger.trace("Getting sales by category start_date=%s end_date=%s", start_date, end_date)
         rows = self._conn.execute(
             """
             SELECT 
@@ -184,7 +197,7 @@ class DailyAccountItemRepository:
             """,
             (start_date, end_date),
         ).fetchall()
-        
+
         return [
             {
                 "category_id": row["category_id"],

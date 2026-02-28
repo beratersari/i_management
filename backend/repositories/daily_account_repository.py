@@ -5,12 +5,16 @@ All SQL for the `daily_accounts` table lives here.
 import sqlite3
 from datetime import datetime, timezone, date
 from typing import Optional
+import logging
 
 from backend.models.daily_account import DailyAccount
+
+logger = logging.getLogger(__name__)
 
 
 class DailyAccountRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing DailyAccountRepository")
         self._conn = conn
 
     # ------------------------------------------------------------------
@@ -18,6 +22,7 @@ class DailyAccountRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, account_id: int) -> Optional[DailyAccount]:
+        logger.trace("Fetching daily account id=%s", account_id)
         row = self._conn.execute(
             "SELECT * FROM daily_accounts WHERE id = ?",
             (account_id,),
@@ -25,6 +30,7 @@ class DailyAccountRepository:
         return DailyAccount.from_row(row) if row else None
 
     def get_by_date(self, account_date: date) -> Optional[DailyAccount]:
+        logger.trace("Fetching daily account by date=%s", account_date)
         row = self._conn.execute(
             "SELECT * FROM daily_accounts WHERE account_date = ?",
             (account_date.isoformat(),),
@@ -34,6 +40,7 @@ class DailyAccountRepository:
     def list_by_date_range(
         self, start_date: date, end_date: date
     ) -> list[DailyAccount]:
+        logger.trace("Listing daily accounts range %s-%s", start_date, end_date)
         rows = self._conn.execute(
             """
             SELECT * FROM daily_accounts
@@ -45,6 +52,7 @@ class DailyAccountRepository:
         return [DailyAccount.from_row(row) for row in rows]
 
     def list_all(self, limit: int = 30) -> list[DailyAccount]:
+        logger.trace("Listing daily accounts limit=%s", limit)
         rows = self._conn.execute(
             "SELECT * FROM daily_accounts ORDER BY account_date DESC LIMIT ?",
             (limit,),
@@ -66,6 +74,7 @@ class DailyAccountRepository:
         items_count: int,
         created_by: int,
     ) -> DailyAccount:
+        logger.info("Creating daily account date=%s", account_date)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
             """
@@ -96,6 +105,7 @@ class DailyAccountRepository:
         account_id: int,
         closed_by: int,
     ) -> Optional[DailyAccount]:
+        logger.info("Closing daily account id=%s", account_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
             """
@@ -113,6 +123,7 @@ class DailyAccountRepository:
         opened_by: int,
     ) -> Optional[DailyAccount]:
         """Reopen a closed account (admin/market_owner only)."""
+        logger.info("Opening daily account id=%s", account_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
             """
@@ -135,6 +146,7 @@ class DailyAccountRepository:
         items_count: int,
         updated_by: int,
     ) -> Optional[DailyAccount]:
+        logger.info("Updating daily account totals id=%s", account_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
             """

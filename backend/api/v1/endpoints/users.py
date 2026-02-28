@@ -7,6 +7,7 @@ User management endpoints:
   DELETE /users/{id}              – Soft-delete a user (Admin, Market Owner, or self)
 """
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+import logging
 
 from backend.core.dependencies import (
     db_dependency,
@@ -17,6 +18,8 @@ from backend.core.dependencies import (
 from backend.models.user import User, UserRole
 from backend.schemas.user import UserCreate, UserUpdate, UserResponse
 from backend.services.user_service import UserService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -40,6 +43,7 @@ def register_user(
 
     Password rules: >= 8 characters, at least one uppercase letter and one digit.
     """
+    logger.info("Registering user %s", data.username)
     service = UserService(conn)
     return service.register_user(data, created_by=current_user)
 
@@ -58,6 +62,7 @@ def list_users(
     Return a list of every registered user. Restricted to **Admins**.
     Pass `?include_deleted=true` to also see soft-deleted accounts.
     """
+    logger.info("Listing users include_deleted=%s", include_deleted)
     service = UserService(conn)
     return service.list_users(include_deleted=include_deleted)
 
@@ -78,6 +83,7 @@ def get_user(
     - **Market Owners** can fetch any employee (role='employee') or themselves.
     - **Employees** can only fetch their own profile.
     """
+    logger.info("Fetching user id=%s", user_id)
     service = UserService(conn)
     target = service.get_user(user_id)
 
@@ -89,10 +95,16 @@ def get_user(
     )
 
     if not (is_self or is_admin or is_owner_viewing_employee):
+        logger.warning(
+            "User id=%s forbidden from accessing user id=%s",
+            current_user.id,
+            user_id,
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to view this profile",
         )
+    logger.info("User id=%s accessed user id=%s", current_user.id, user_id)
     return target
 
 
@@ -112,6 +124,7 @@ def update_user(
     - **Admins** can update any field for any user.
     - **Market Owners** can update employees (role='employee') but cannot change roles.
     """
+    logger.info("Updating user id=%s", user_id)
     service = UserService(conn)
     return service.update_user(user_id, data, updated_by=current_user)
 
@@ -134,5 +147,6 @@ def delete_user(
     - **Market Owners** can delete employees (role='employee').
     - Any user can delete their own account.
     """
+    logger.info("Deleting user id=%s", user_id)
     service = UserService(conn)
     service.delete_user(user_id, deleted_by=current_user)

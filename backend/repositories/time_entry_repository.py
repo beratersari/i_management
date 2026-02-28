@@ -6,12 +6,16 @@ import sqlite3
 from datetime import datetime, timezone, date, time
 from decimal import Decimal
 from typing import Optional
+import logging
 
 from backend.models.time_entry import TimeEntry, TimeEntryStatus
+
+logger = logging.getLogger(__name__)
 
 
 class TimeEntryRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing TimeEntryRepository")
         self._conn = conn
 
     # ------------------------------------------------------------------
@@ -19,6 +23,7 @@ class TimeEntryRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, entry_id: int) -> Optional[TimeEntry]:
+        logger.trace("Fetching time entry id=%s", entry_id)
         row = self._conn.execute(
             "SELECT * FROM time_entries WHERE id = ?",
             (entry_id,),
@@ -30,6 +35,7 @@ class TimeEntryRepository:
         employee_id: int, 
         status: Optional[TimeEntryStatus] = None
     ) -> list[TimeEntry]:
+        logger.trace("Listing time entries employee_id=%s status=%s", employee_id, status)
         if status:
             rows = self._conn.execute(
                 """
@@ -56,6 +62,7 @@ class TimeEntryRepository:
         end_date: date,
         status: Optional[TimeEntryStatus] = None
     ) -> list[TimeEntry]:
+        logger.trace("Listing time entries by date range")
         if status:
             rows = self._conn.execute(
                 """
@@ -78,6 +85,7 @@ class TimeEntryRepository:
 
     def list_pending(self) -> list[TimeEntry]:
         """List all pending time entries (for admin/market_owner review)."""
+        logger.trace("Listing pending time entries")
         rows = self._conn.execute(
             """
             SELECT * FROM time_entries 
@@ -89,6 +97,7 @@ class TimeEntryRepository:
         return [TimeEntry.from_row(row) for row in rows]
 
     def list_all(self, limit: int = 100) -> list[TimeEntry]:
+        logger.trace("Listing all time entries limit=%s", limit)
         rows = self._conn.execute(
             "SELECT * FROM time_entries ORDER BY work_date DESC LIMIT ?",
             (limit,),
@@ -109,6 +118,7 @@ class TimeEntryRepository:
         notes: Optional[str],
         created_by: int,
     ) -> TimeEntry:
+        logger.info("Creating time entry employee_id=%s", employee_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
             """
@@ -157,8 +167,10 @@ class TimeEntryRepository:
             fields["notes"] = notes
 
         if not fields:
+            logger.trace("No time entry fields to update id=%s", entry_id)
             return self.get_by_id(entry_id)
 
+        logger.info("Updating time entry record id=%s", entry_id)
         fields["updated_by"] = updated_by
         fields["updated_at"] = datetime.now(tz=timezone.utc).isoformat()
         set_clause = ", ".join(f"{col} = ?" for col in fields)
@@ -175,6 +187,7 @@ class TimeEntryRepository:
         reviewed_by: int,
         rejection_reason: Optional[str] = None,
     ) -> Optional[TimeEntry]:
+        logger.info("Reviewing time entry record id=%s", entry_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
             """
@@ -188,8 +201,10 @@ class TimeEntryRepository:
         return self.get_by_id(entry_id)
 
     def delete(self, entry_id: int) -> bool:
+        logger.info("Deleting time entry record id=%s", entry_id)
         cursor = self._conn.execute(
             "DELETE FROM time_entries WHERE id = ?",
             (entry_id,),
         )
+        logger.info("Time entry delete affected %s rows", cursor.rowcount)
         return cursor.rowcount > 0

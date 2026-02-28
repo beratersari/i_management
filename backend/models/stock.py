@@ -20,9 +20,19 @@ class StockEntry:
     created_at: datetime
     updated_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized StockEntry model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "StockEntry":
         """Build a StockEntry from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating StockEntry from database row")
         return cls(
             id=row["id"],
             item_id=row["item_id"],

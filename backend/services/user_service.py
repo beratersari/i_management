@@ -8,6 +8,7 @@ Business rules enforced here:
 """
 import sqlite3
 from typing import Optional
+import logging
 
 from fastapi import HTTPException, status
 
@@ -16,9 +17,12 @@ from backend.models.user import User, UserRole
 from backend.repositories.user_repository import UserRepository
 from backend.schemas.user import UserCreate, UserUpdate
 
+logger = logging.getLogger(__name__)
+
 
 class UserService:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing UserService")
         self._repo = UserRepository(conn)
 
     # ------------------------------------------------------------------
@@ -27,8 +31,10 @@ class UserService:
 
     def get_user(self, user_id: int) -> User:
         """Return a non-deleted user or raise 404."""
+        logger.info("Fetching user id=%s", user_id)
         user = self._repo.get_active_by_id(user_id)
         if not user:
+            logger.warning("User id=%s not found", user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with id={user_id} not found",
@@ -36,6 +42,7 @@ class UserService:
         return user
 
     def list_users(self, include_deleted: bool = False) -> list[User]:
+        logger.info("Listing users include_deleted=%s", include_deleted)
         return self._repo.list_all(include_deleted=include_deleted)
 
     # ------------------------------------------------------------------
@@ -50,9 +57,15 @@ class UserService:
         - **Admin** – may create any role (admin, market_owner, employee).
         - **Market Owner** – may only create Employees.
         """
+        logger.info("Registering user %s", data.username)
         # Role-based creation restrictions
         if created_by.role == UserRole.MARKET_OWNER:
             if data.role != UserRole.EMPLOYEE:
+                logger.warning(
+                    "Market owner id=%s attempted to create role=%s",
+                    created_by.id,
+                    data.role.value,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Market owners can only create employee accounts",
@@ -60,40 +73,55 @@ class UserService:
 
         # Uniqueness checks (only among non-deleted users)
         if self._repo.get_by_email(data.email):
+            logger.warning("Duplicate email registration attempt: %s", data.email)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email is already registered",
             )
         if self._repo.get_by_username(data.username):
+            logger.warning("Duplicate username registration attempt: %s", data.username)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Username is already taken",
             )
 
-        return self._repo.create(
+        user = self._repo.create(
             email=data.email,
             username=data.username,
             hashed_password=hash_password(data.password),
             role=data.role,
             full_name=data.full_name,
         )
+        logger.info("User registered id=%s", user.id)
+        return user
 
     # ------------------------------------------------------------------
     # Update
     # ------------------------------------------------------------------
 
     def update_user(self, user_id: int, data: UserUpdate, updated_by: User) -> User:
+        logger.info("Updating user id=%s", user_id)
         target = self.get_user(user_id)  # raises 404 if not found / deleted
 
         # Market owners can only update employees (users with role='employee')
         if updated_by.role == UserRole.MARKET_OWNER:
             if target.role != UserRole.EMPLOYEE:
+                logger.warning(
+                    "Market owner id=%s attempted to update non-employee id=%s",
+                    updated_by.id,
+                    user_id,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You can only update employee accounts",
                 )
             # Market owners cannot change roles
             if data.role is not None:
+                logger.warning(
+                    "Market owner id=%s attempted to change roles for user id=%s",
+                    updated_by.id,
+                    user_id,
+                )
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Market owners cannot change user roles",
@@ -104,6 +132,7 @@ class UserService:
         if data.email is not None:
             existing = self._repo.get_by_email(data.email)
             if existing and existing.id != user_id:
+                logger.warning("Duplicate email update attempt: %s", data.email)
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Email is already registered",
@@ -122,7 +151,9 @@ class UserService:
         if data.is_active is not None:
             updates["is_active"] = int(data.is_active)
 
-        return self._repo.update(user_id, **updates)  # type: ignore[return-value]
+        updated_user = self._repo.update(user_id, **updates)  # type: ignore[return-value]
+        logger.info("User updated id=%s", user_id)
+        return updated_user
 
     # ------------------------------------------------------------------
     # Soft delete
@@ -138,6 +169,7 @@ class UserService:
         - Market owners can only soft-delete employees (role='employee').
         - A user can soft-delete their own account.
         """
+        logger.info("Deleting user id=%s", user_id)
         target = self.get_user(user_id)  # raises 404 if already deleted
 
         is_self = deleted_by.id == user_id
@@ -148,13 +180,20 @@ class UserService:
         )
 
         if not (is_self or is_admin or is_owner_deleting_employee):
+            logger.warning(
+                "User id=%s forbidden from deleting user id=%s",
+                deleted_by.id,
+                user_id,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="You do not have permission to delete this account",
             )
 
         if not self._repo.soft_delete(user_id):
+            logger.warning("User id=%s not found for deletion", user_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"User with id={user_id} not found",
             )
+        logger.info("User deleted id=%s", user_id)

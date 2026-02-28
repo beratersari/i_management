@@ -8,12 +8,15 @@ Authentication endpoints:
 """
 from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
+import logging
 
 from backend.core.dependencies import db_dependency, get_current_active_user
 from backend.models.user import User
 from backend.schemas.token import Token, AccessToken, RefreshTokenRequest
 from backend.schemas.user import UserResponse
 from backend.services.auth_service import AuthService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -35,6 +38,7 @@ def login(
     Returns a short-lived **access token** (15 min) and a long-lived
     **refresh token** (7 days).
     """
+    logger.info("Login requested for username=%s", form_data.username)
     service = AuthService(conn)
     return service.login(form_data.username, form_data.password)
 
@@ -51,6 +55,7 @@ def refresh_token(
     """
     Exchange a valid, non-revoked **refresh token** for a fresh **access token**.
     """
+    logger.info("Refreshing access token")
     service = AuthService(conn)
     return service.refresh(body.refresh_token)
 
@@ -69,6 +74,7 @@ def logout(
     Revoke the supplied **refresh token**, effectively ending the session
     associated with that token.
     """
+    logger.info("Logout requested")
     service = AuthService(conn)
     service.logout(body.refresh_token)
 
@@ -86,6 +92,7 @@ def logout_all(
     Revoke **every** refresh token issued to the currently authenticated user.
     Useful for "sign out everywhere" functionality.
     """
+    logger.info("Logout all requested for user id=%s", current_user.id)
     service = AuthService(conn)
     service.logout_all(current_user.id)
 
@@ -97,4 +104,5 @@ def logout_all(
 )
 def get_me(current_user: User = Depends(get_current_active_user)):
     """Return the profile of the currently authenticated user."""
+    logger.info("Returning profile for user id=%s", current_user.id)
     return current_user

@@ -32,9 +32,19 @@ class TimeEntry:
     created_at: datetime
     updated_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized TimeEntry model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "TimeEntry":
         """Build a TimeEntry from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating TimeEntry from database row")
         reviewed_at_raw = row["reviewed_at"]
         return cls(
             id=row["id"],

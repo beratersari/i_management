@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # CORS
     ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
 
+    # Logging
+    LOG_LEVEL: str = "INFO"
+    LOG_LEVELS: str = "TRACE,ERROR,WARNING,INFO"
+    LOG_FILE_PATH: str = "./backend/logs/app.log"
+    LOG_TRACE_CALLS: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

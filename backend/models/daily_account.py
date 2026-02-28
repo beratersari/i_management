@@ -25,9 +25,19 @@ class DailyAccount:
     created_at: datetime
     updated_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized DailyAccount model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "DailyAccount":
         """Build a DailyAccount from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating DailyAccount from database row")
         closed_at_raw = row["closed_at"]
         return cls(
             id=row["id"],

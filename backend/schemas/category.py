@@ -18,6 +18,7 @@ class CategoryCreate(BaseModel):
 class CategoryUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
+    sort_order: Optional[int] = Field(None, ge=0)
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
+    sort_order: int
     created_by: int
     updated_by: int
     created_at: datetime

@@ -4,8 +4,11 @@ Pydantic schemas for StockEntry request/response validation.
 from decimal import Decimal
 from datetime import datetime
 from typing import Optional
+import logging
 
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -19,6 +22,7 @@ class StockCreate(BaseModel):
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        logger.trace("Coercing stock decimal value")
         return Decimal(str(v)) if v is not None else v
 
 
@@ -28,6 +32,7 @@ class StockUpdate(BaseModel):
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        logger.trace("Coercing stock decimal value")
         return Decimal(str(v)) if v is not None else v
 
 

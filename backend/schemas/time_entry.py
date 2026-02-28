@@ -4,10 +4,13 @@ Pydantic schemas for TimeEntry request/response validation.
 from datetime import datetime, date, time
 from decimal import Decimal
 from typing import Optional
+import logging
 
 from pydantic import BaseModel, Field, field_validator
 
 from backend.models.time_entry import TimeEntryStatus
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -23,7 +26,9 @@ class TimeEntryCreate(BaseModel):
     @field_validator("end_hour")
     @classmethod
     def end_after_start(cls, v, info):
+        logger.trace("Validating end hour after start")
         if "start_hour" in info.data and v <= info.data["start_hour"]:
+            logger.warning("End hour before start hour")
             raise ValueError("End hour must be after start hour")
         return v
 
@@ -46,8 +51,10 @@ class TimeEntryReview(BaseModel):
     @field_validator("rejection_reason")
     @classmethod
     def require_rejection_reason(cls, v, info):
+        logger.trace("Validating rejection reason")
         if "status" in info.data and info.data["status"] == TimeEntryStatus.REJECTED:
             if not v or not v.strip():
+                logger.warning("Missing rejection reason")
                 raise ValueError("Rejection reason is required when rejecting a time entry")
         return v
 

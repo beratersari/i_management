@@ -9,12 +9,16 @@ Design rules enforced at DB level:
 import sqlite3
 from datetime import datetime, timezone
 from typing import Optional
+import logging
 
 from backend.models.stock import StockEntry
+
+logger = logging.getLogger(__name__)
 
 
 class StockRepository:
     def __init__(self, conn: sqlite3.Connection) -> None:
+        logger.trace("Initializing StockRepository")
         self._conn = conn
 
     # ------------------------------------------------------------------
@@ -23,6 +27,7 @@ class StockRepository:
 
     def get_by_id(self, entry_id: int) -> Optional[StockEntry]:
         """Return a stock entry by its own primary key."""
+        logger.trace("Fetching stock entry id=%s", entry_id)
         row = self._conn.execute(
             "SELECT * FROM stock_entries WHERE id = ?", (entry_id,)
         ).fetchone()
@@ -30,6 +35,7 @@ class StockRepository:
 
     def get_by_item_id(self, item_id: int) -> Optional[StockEntry]:
         """Return the stock entry for a specific item (None if not stocked yet)."""
+        logger.trace("Fetching stock entry item_id=%s", item_id)
         row = self._conn.execute(
             "SELECT * FROM stock_entries WHERE item_id = ?", (item_id,)
         ).fetchone()
@@ -37,6 +43,7 @@ class StockRepository:
 
     def list_all(self) -> list[StockEntry]:
         """Return every stock entry ordered by item_id."""
+        logger.trace("Listing stock entries")
         rows = self._conn.execute(
             "SELECT * FROM stock_entries ORDER BY item_id"
         ).fetchall()
@@ -54,6 +61,7 @@ class StockRepository:
                               item_id, item_name, sku, unit_type,
                               unit_price, quantity, stock_entry_id
         """
+        logger.trace("Listing stock grouped by category")
         rows = self._conn.execute(
             """
             SELECT
@@ -112,6 +120,7 @@ class StockRepository:
         Insert a new stock entry for an item.
         Raises sqlite3.IntegrityError if item_id already exists (UNIQUE constraint).
         """
+        logger.info("Creating stock entry item_id=%s", item_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
             """
@@ -129,6 +138,7 @@ class StockRepository:
         updated_by: int,
     ) -> Optional[StockEntry]:
         """Update the quantity for an existing stock entry."""
+        logger.info("Updating stock entry item_id=%s", item_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
             """
@@ -142,7 +152,9 @@ class StockRepository:
 
     def delete(self, item_id: int) -> bool:
         """Remove the stock entry for an item."""
+        logger.info("Deleting stock entry item_id=%s", item_id)
         cursor = self._conn.execute(
             "DELETE FROM stock_entries WHERE item_id = ?", (item_id,)
         )
+        logger.info("Stock delete affected %s rows", cursor.rowcount)
         return cursor.rowcount > 0

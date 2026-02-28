@@ -3,8 +3,11 @@ Pydantic schemas for Cart request/response validation.
 """
 from datetime import datetime
 from decimal import Decimal
+import logging
 
 from pydantic import BaseModel, Field, field_validator
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -15,6 +18,10 @@ class CartCreate(BaseModel):
     """Empty payload for creating a cart (user context provides creator)."""
 
 
+class CartUpdate(BaseModel):
+    desk_number: str | None = Field(None, min_length=1, max_length=20, description="Optional desk/table identifier for cafe orders")
+
+
 class CartItemCreate(BaseModel):
     item_id: int = Field(..., gt=0, description="ID of the item to add")
     quantity: Decimal = Field(..., gt=0, decimal_places=3)
@@ -22,6 +29,7 @@ class CartItemCreate(BaseModel):
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        logger.trace("Coercing cart decimal value")
         return Decimal(str(v)) if v is not None else v
 
 
@@ -31,6 +39,7 @@ class CartItemUpdate(BaseModel):
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        logger.trace("Coercing cart decimal value")
         return Decimal(str(v)) if v is not None else v
 
 
@@ -74,6 +83,7 @@ class CartItemResponse(BaseModel):
 
 class CartResponse(BaseModel):
     id: int
+    desk_number: str | None
     created_by: int
     updated_by: int
     created_at: datetime

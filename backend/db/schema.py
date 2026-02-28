@@ -5,7 +5,11 @@ Tables are created in dependency order so foreign keys resolve correctly.
 Migration helpers run ALTER TABLE only when a column does not yet exist,
 making them safe to call on every startup (idempotent).
 """
+import logging
+
 from backend.db.database import get_connection
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # DDL
@@ -44,6 +48,7 @@ CREATE TABLE IF NOT EXISTS categories (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT    NOT NULL UNIQUE,
     description TEXT,
+    sort_order  INTEGER NOT NULL DEFAULT 0,
     created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     updated_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -71,6 +76,19 @@ CREATE TABLE IF NOT EXISTS items (
 );
 """
 
+CREATE_MENU_ITEMS_TABLE = """
+CREATE TABLE IF NOT EXISTS menu_items (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id       INTEGER NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE,
+    display_name  TEXT    NOT NULL,
+    description   TEXT,
+    allergens     TEXT,
+    created_by    INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+"""
+
 CREATE_STOCK_TABLE = """
 CREATE TABLE IF NOT EXISTS stock_entries (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -86,11 +104,12 @@ CREATE TABLE IF NOT EXISTS stock_entries (
 
 CREATE_CARTS_TABLE = """
 CREATE TABLE IF NOT EXISTS carts (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    created_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
-    updated_by  INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now')),
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    desk_number  TEXT    UNIQUE,
+    created_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    updated_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at   TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 """
 
@@ -177,6 +196,11 @@ MIGRATIONS = [
     # Add soft-delete columns if they were not in the original schema
     ("users", "is_deleted",      "ALTER TABLE users ADD COLUMN is_deleted      INTEGER NOT NULL DEFAULT 0"),
     ("users", "deleted_at",      "ALTER TABLE users ADD COLUMN deleted_at      TEXT"),
+    ("categories", "sort_order", "ALTER TABLE categories ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0"),
+    ("menu_items", "display_name", "ALTER TABLE menu_items ADD COLUMN display_name TEXT NOT NULL DEFAULT ''"),
+    ("menu_items", "description", "ALTER TABLE menu_items ADD COLUMN description TEXT"),
+    ("menu_items", "allergens", "ALTER TABLE menu_items ADD COLUMN allergens TEXT"),
+    ("carts", "desk_number", "ALTER TABLE carts ADD COLUMN desk_number TEXT"),
 ]
 
 # ---------------------------------------------------------------------------
@@ -188,6 +212,7 @@ ALL_TABLES = [
     CREATE_REFRESH_TOKENS_TABLE,
     CREATE_CATEGORIES_TABLE,
     CREATE_ITEMS_TABLE,
+    CREATE_MENU_ITEMS_TABLE,
     CREATE_STOCK_TABLE,
     CREATE_CARTS_TABLE,
     CREATE_CART_ITEMS_TABLE,
@@ -198,12 +223,14 @@ ALL_TABLES = [
 
 
 def _column_exists(conn, table: str, column: str) -> bool:
+    logger.trace("Checking column existence table=%s column=%s", table, column)
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     return any(r["name"] == column for r in rows)
 
 
 def create_tables() -> None:
     """Create all tables and apply incremental migrations."""
+    logger.info("Creating database tables and applying migrations")
     conn = get_connection()
     try:
         cursor = conn.cursor()
@@ -215,8 +242,10 @@ def create_tables() -> None:
         # 2. Run migrations only when the column is missing
         for table, column, alter_sql in MIGRATIONS:
             if not _column_exists(conn, table, column):
+                logger.warning("Applying migration for %s.%s", table, column)
                 cursor.execute(alter_sql)
 
         conn.commit()
+        logger.info("Database schema ready")
     finally:
         conn.close()

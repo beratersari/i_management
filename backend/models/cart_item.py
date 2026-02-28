@@ -17,9 +17,19 @@ class CartItem:
     created_at: datetime
     updated_at: datetime
 
+    def __post_init__(self) -> None:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Initialized CartItem model id=%s", self.id)
+
     @classmethod
     def from_row(cls, row) -> "CartItem":
         """Build a CartItem from a sqlite3.Row object."""
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.trace("Hydrating CartItem from database row")
         return cls(
             id=row["id"],
             cart_id=row["cart_id"],

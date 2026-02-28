@@ -9,6 +9,8 @@ Run with:  uvicorn backend.main:app --reload
 import logging
 
 from fastapi import FastAPI
+
+from backend.core.logging_config import configure_logging
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.core.config import settings
@@ -17,10 +19,12 @@ from backend.db.database import init_db
 from backend.db.seeder import seed_admin
 from backend.db.mock_seeder import seed_mock_data
 
-logging.basicConfig(level=logging.INFO)
+configure_logging()
 
 
 def create_app() -> FastAPI:
+    logger = logging.getLogger(__name__)
+    logger.info("Starting FastAPI application setup")
     app = FastAPI(
         title=settings.APP_NAME,
         version=settings.APP_VERSION,
@@ -47,6 +51,7 @@ def create_app() -> FastAPI:
     # ── Startup / shutdown events ───────────────────────────────────────────
     @app.on_event("startup")
     def on_startup() -> None:
+        logger.info("Initializing database and seed data")
         init_db()
         # ⚠️ DEV ONLY – remove these seeders before going to production
         seed_admin()
