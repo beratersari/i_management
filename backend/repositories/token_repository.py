@@ -8,6 +8,7 @@ from typing import Optional
 import logging
 
 from backend.models.token import RefreshToken
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class TokenRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_token(self, token: str) -> Optional[RefreshToken]:
         """Return the refresh token row for the given token string."""
         logger.trace("Fetching refresh token record")
@@ -36,6 +38,7 @@ class TokenRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(self, user_id: int, token: str, expires_at: datetime) -> RefreshToken:
         """Insert a refresh token row and return it."""
         logger.info("Creating refresh token for user id=%s", user_id)
@@ -51,6 +54,7 @@ class TokenRepository:
         ).fetchone()
         return RefreshToken.from_row(row)
 
+    @log_db_timing
     def revoke(self, token: str) -> bool:
         """Mark a single token as revoked and return True if updated."""
         logger.info("Revoking refresh token")
@@ -60,6 +64,7 @@ class TokenRepository:
         logger.info("Refresh token revoke affected %s rows", cursor.rowcount)
         return cursor.rowcount > 0
 
+    @log_db_timing
     def revoke_all_for_user(self, user_id: int) -> int:
         """Revoke all active refresh tokens for a user and return count."""
         logger.info("Revoking all refresh tokens for user id=%s", user_id)
@@ -70,6 +75,7 @@ class TokenRepository:
         logger.info("Refresh tokens revoked count=%s", cursor.rowcount)
         return cursor.rowcount
 
+    @log_db_timing
     def delete_expired(self) -> int:
         """Delete expired refresh tokens and return the count removed."""
         now = datetime.now(tz=timezone.utc).isoformat()

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import logging
 
 from backend.models.user import User, UserRole
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class UserRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, user_id: int) -> Optional[User]:
         """Return a user by id or None if missing."""
         logger.trace("Fetching user by id=%s", user_id)
@@ -32,6 +34,7 @@ class UserRepository:
         ).fetchone()
         return User.from_row(row) if row else None
 
+    @log_db_timing
     def get_active_by_id(self, user_id: int) -> Optional[User]:
         """Return a user only if they are not soft-deleted."""
         logger.trace("Fetching active user by id=%s", user_id)
@@ -40,6 +43,7 @@ class UserRepository:
         ).fetchone()
         return User.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_email(self, email: str) -> Optional[User]:
         """Return a non-deleted user by email."""
         logger.trace("Fetching user by email=%s", email)
@@ -48,6 +52,7 @@ class UserRepository:
         ).fetchone()
         return User.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_username(self, username: str) -> Optional[User]:
         """Return a non-deleted user by username."""
         logger.trace("Fetching user by username=%s", username)
@@ -56,6 +61,7 @@ class UserRepository:
         ).fetchone()
         return User.from_row(row) if row else None
 
+    @log_db_timing
     def list_all(self, include_deleted: bool = False) -> list[User]:
         """Return users, optionally including soft-deleted accounts."""
         logger.trace("Listing users include_deleted=%s", include_deleted)
@@ -71,6 +77,7 @@ class UserRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(
         self,
         email: str,
@@ -90,6 +97,7 @@ class UserRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def update(self, user_id: int, **fields) -> Optional[User]:
         """Update user fields and return the updated row."""
         if not fields:
@@ -105,6 +113,7 @@ class UserRepository:
         )
         return self.get_by_id(user_id)
 
+    @log_db_timing
     def soft_delete(self, user_id: int) -> bool:
         """
         Mark the user as deleted without removing the row.

@@ -9,6 +9,7 @@ import logging
 
 from backend.models.daily_account import DailyAccount
 from backend.models.daily_account_item import DailyAccountItem
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class DailyAccountRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, account_id: int) -> Optional[DailyAccount]:
         """Return a daily account by id or None if missing."""
         logger.trace("Fetching daily account id=%s", account_id)
@@ -34,6 +36,7 @@ class DailyAccountRepository:
         ).fetchone()
         return DailyAccount.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_date(self, account_date: date) -> Optional[DailyAccount]:
         """Return a daily account by date or None if missing."""
         logger.trace("Fetching daily account by date=%s", account_date)
@@ -43,6 +46,7 @@ class DailyAccountRepository:
         ).fetchone()
         return DailyAccount.from_row(row) if row else None
 
+    @log_db_timing
     def list_by_date_range(
         self, start_date: date, end_date: date
     ) -> list[DailyAccount]:
@@ -58,6 +62,7 @@ class DailyAccountRepository:
         ).fetchall()
         return [DailyAccount.from_row(row) for row in rows]
 
+    @log_db_timing
     def list_all(self, limit: int = 30) -> list[DailyAccount]:
         """Return recent daily accounts limited by the provided count."""
         logger.trace("Listing daily accounts limit=%s", limit)
@@ -71,6 +76,7 @@ class DailyAccountRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(
         self,
         account_date: date,
@@ -109,6 +115,7 @@ class DailyAccountRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def close_account(
         self,
         account_id: int,
@@ -127,6 +134,7 @@ class DailyAccountRepository:
         )
         return self.get_by_id(account_id)
 
+    @log_db_timing
     def open_account(
         self,
         account_id: int,
@@ -145,6 +153,7 @@ class DailyAccountRepository:
         )
         return self.get_by_id(account_id)
 
+    @log_db_timing
     def update_totals(
         self,
         account_id: int,
@@ -174,6 +183,7 @@ class DailyAccountRepository:
     # Daily account items
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_item_by_id(self, item_id: int) -> Optional[DailyAccountItem]:
         """Return a daily account item by id or None if missing."""
         logger.trace("Fetching daily account item id=%s", item_id)
@@ -183,6 +193,7 @@ class DailyAccountRepository:
         ).fetchone()
         return DailyAccountItem.from_row(row) if row else None
 
+    @log_db_timing
     def list_items_by_account(self, account_id: int) -> list[DailyAccountItem]:
         """Return daily account items for the specified account."""
         logger.trace("Listing daily account items account_id=%s", account_id)
@@ -192,6 +203,7 @@ class DailyAccountRepository:
         ).fetchall()
         return [DailyAccountItem.from_row(row) for row in rows]
 
+    @log_db_timing
     def create_item(
         self,
         account_id: int,
@@ -237,6 +249,7 @@ class DailyAccountRepository:
         )
         return self.get_item_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def delete_items_by_account(self, account_id: int) -> int:
         """Delete all account items for an account and return count removed."""
         logger.info("Deleting daily account items account_id=%s", account_id)
@@ -247,6 +260,7 @@ class DailyAccountRepository:
         logger.info("Daily account items delete affected %s rows", cursor.rowcount)
         return cursor.rowcount
 
+    @log_db_timing
     def get_item_sales_by_date_range(
         self, item_id: int, start_date: str, end_date: str
     ) -> dict:
@@ -287,6 +301,7 @@ class DailyAccountRepository:
             "avg_unit_price": row["avg_unit_price"],
         }
 
+    @log_db_timing
     def get_top_sellers(
         self, start_date: str, end_date: str, limit: int = 10
     ) -> list[dict]:
@@ -325,6 +340,7 @@ class DailyAccountRepository:
             for row in rows
         ]
 
+    @log_db_timing
     def get_sales_by_category(
         self, start_date: str, end_date: str
     ) -> list[dict]:

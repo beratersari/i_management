@@ -12,6 +12,7 @@ from typing import Optional
 import logging
 
 from backend.models.stock import StockEntry
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,7 @@ class StockRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, entry_id: int) -> Optional[StockEntry]:
         """Return a stock entry by its own primary key."""
         logger.trace("Fetching stock entry id=%s", entry_id)
@@ -36,6 +38,7 @@ class StockRepository:
         ).fetchone()
         return StockEntry.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_item_id(self, item_id: int) -> Optional[StockEntry]:
         """Return the stock entry for a specific item (None if not stocked yet)."""
         logger.trace("Fetching stock entry item_id=%s", item_id)
@@ -44,6 +47,7 @@ class StockRepository:
         ).fetchone()
         return StockEntry.from_row(row) if row else None
 
+    @log_db_timing
     def list_all(self) -> list[StockEntry]:
         """Return every stock entry ordered by item_id."""
         logger.trace("Listing stock entries")
@@ -52,6 +56,7 @@ class StockRepository:
         ).fetchall()
         return [StockEntry.from_row(r) for r in rows]
 
+    @log_db_timing
     def list_grouped_by_category(self) -> list[dict]:
         """
         Return all stocked items grouped by their category, sorted by item name
@@ -113,6 +118,7 @@ class StockRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def add(
         self,
         item_id: int,
@@ -134,6 +140,7 @@ class StockRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def update_quantity(
         self,
         item_id: int,
@@ -153,6 +160,27 @@ class StockRepository:
         )
         return self.get_by_item_id(item_id)
 
+    @log_db_timing
+    def adjust_quantity(
+        self,
+        item_id: int,
+        delta: float,
+        updated_by: int,
+    ) -> Optional[StockEntry]:
+        """Adjust the quantity for an existing stock entry by a delta."""
+        logger.info("Adjusting stock entry item_id=%s by delta=%s", item_id, delta)
+        now = datetime.now(tz=timezone.utc).isoformat()
+        self._conn.execute(
+            """
+            UPDATE stock_entries
+               SET quantity = quantity + ?, updated_by = ?, updated_at = ?
+             WHERE item_id = ?
+            """,
+            (delta, updated_by, now, item_id),
+        )
+        return self.get_by_item_id(item_id)
+
+    @log_db_timing
     def delete(self, item_id: int) -> bool:
         """Remove the stock entry for an item."""
         logger.info("Deleting stock entry item_id=%s", item_id)

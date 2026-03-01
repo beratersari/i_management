@@ -120,10 +120,8 @@ class StockService:
     def remove_from_stock(self, item_id: int) -> None:
         """Remove a stock entry and raise 404 if missing."""
         logger.info("Removing stock entry item_id=%s", item_id)
-        if not self._repo.delete(item_id):
-            logger.warning("Stock entry not found for item id=%s", item_id)
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No stock entry found for item id={item_id}",
-            )
+        # Ensure the entry exists
+        self.get_entry(item_id)
+        
+        self._repo.delete(item_id)
         logger.info("Stock entry removed item_id=%s", item_id)

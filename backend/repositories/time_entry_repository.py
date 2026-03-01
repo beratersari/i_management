@@ -9,6 +9,7 @@ from typing import Optional
 import logging
 
 from backend.models.time_entry import TimeEntry, TimeEntryStatus
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,7 @@ class TimeEntryRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, entry_id: int) -> Optional[TimeEntry]:
         """Return a time entry by id or None if missing."""
         logger.trace("Fetching time entry id=%s", entry_id)
@@ -34,6 +36,7 @@ class TimeEntryRepository:
         ).fetchone()
         return TimeEntry.from_row(row) if row else None
 
+    @log_db_timing
     def list_by_employee(
         self, 
         employee_id: int, 
@@ -61,6 +64,7 @@ class TimeEntryRepository:
             ).fetchall()
         return [TimeEntry.from_row(row) for row in rows]
 
+    @log_db_timing
     def list_by_date_range(
         self, 
         start_date: date, 
@@ -89,6 +93,7 @@ class TimeEntryRepository:
             ).fetchall()
         return [TimeEntry.from_row(row) for row in rows]
 
+    @log_db_timing
     def list_pending(self) -> list[TimeEntry]:
         """List all pending time entries (for admin/market_owner review)."""
         logger.trace("Listing pending time entries")
@@ -102,6 +107,7 @@ class TimeEntryRepository:
         ).fetchall()
         return [TimeEntry.from_row(row) for row in rows]
 
+    @log_db_timing
     def list_all(self, limit: int = 100) -> list[TimeEntry]:
         """Return recent time entries limited by the provided count."""
         logger.trace("Listing all time entries limit=%s", limit)
@@ -115,6 +121,7 @@ class TimeEntryRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(
         self,
         employee_id: int,
@@ -152,6 +159,7 @@ class TimeEntryRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def update(
         self,
         entry_id: int,
@@ -189,6 +197,7 @@ class TimeEntryRepository:
         )
         return self.get_by_id(entry_id)
 
+    @log_db_timing
     def review(
         self,
         entry_id: int,
@@ -210,6 +219,7 @@ class TimeEntryRepository:
         )
         return self.get_by_id(entry_id)
 
+    @log_db_timing
     def delete(self, entry_id: int) -> bool:
         """Delete a time entry by id and return True if removed."""
         logger.info("Deleting time entry record id=%s", entry_id)

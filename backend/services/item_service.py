@@ -158,10 +158,8 @@ class ItemService:
     def delete_item(self, item_id: int) -> None:
         """Delete an item and raise 404 if it does not exist."""
         logger.info("Deleting item id=%s", item_id)
-        if not self._repo.delete(item_id):
-            logger.warning("Item id=%s not found for deletion", item_id)
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Item with id={item_id} not found",
-            )
+        # Verify existence first
+        self.get_item(item_id)
+        
+        self._repo.delete(item_id)
         logger.info("Item deleted id=%s", item_id)

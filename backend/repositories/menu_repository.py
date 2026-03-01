@@ -8,6 +8,7 @@ from typing import Optional
 import logging
 
 from backend.models.menu_item import MenuItem
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class MenuRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, menu_item_id: int) -> Optional[MenuItem]:
         """Return a menu item by id or None if missing."""
         logger.trace("Fetching menu item id=%s", menu_item_id)
@@ -32,6 +34,7 @@ class MenuRepository:
         ).fetchone()
         return MenuItem.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_item_id(self, item_id: int) -> Optional[MenuItem]:
         """Return the menu item for a given item id, if present."""
         logger.trace("Fetching menu item item_id=%s", item_id)
@@ -40,6 +43,7 @@ class MenuRepository:
         ).fetchone()
         return MenuItem.from_row(row) if row else None
 
+    @log_db_timing
     def list_all(self) -> list[MenuItem]:
         """Return all menu items ordered by item id."""
         logger.trace("Listing menu items")
@@ -48,6 +52,7 @@ class MenuRepository:
         ).fetchall()
         return [MenuItem.from_row(r) for r in rows]
 
+    @log_db_timing
     def list_public(self) -> list[dict]:
         """Return menu items with the public field subset."""
         logger.trace("Listing public menu items")
@@ -77,6 +82,7 @@ class MenuRepository:
             for r in rows
         ]
 
+    @log_db_timing
     def list_grouped_by_category_public(self) -> list[dict]:
         """
         Return menu items grouped by category (public field subset).
@@ -136,6 +142,7 @@ class MenuRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def add(
         self,
         item_id: int,
@@ -159,6 +166,7 @@ class MenuRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def delete(self, item_id: int) -> bool:
         """Delete a menu item by item id and return True if removed."""
         logger.info("Deleting menu item item_id=%s", item_id)

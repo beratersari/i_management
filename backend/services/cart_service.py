@@ -8,7 +8,7 @@ import logging
 
 from fastapi import HTTPException, status
 
-from backend.models.cart import Cart
+from backend.models.cart import Cart, CartStatus
 from backend.models.cart_item import CartItem
 from backend.models.item import Item
 from backend.models.stock import StockEntry
@@ -16,7 +16,7 @@ from backend.models.user import User
 from backend.repositories.cart_repository import CartRepository
 from backend.repositories.item_repository import ItemRepository
 from backend.repositories.stock_repository import StockRepository
-from backend.schemas.cart import CartItemCreate, CartItemUpdate, CartUpdate
+from backend.schemas.cart import CartItemCreate, CartItemReturn, CartItemUpdate, CartUpdate, CartStatus
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +55,58 @@ class CartService:
             )
         return cart
 
+    def _ensure_cart_editable(self, cart: Cart) -> None:
+        """Raise an error if the cart is not in draft status."""
+        if cart.status != CartStatus.DRAFT:
+            logger.warning("Cart id=%s is not editable (status=%s)", cart.id, cart.status.value)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Cart is not editable (status={cart.status.value}). Only draft carts can be modified.",
+            )
+
+    def update_cart_status(self, cart_id: int, status: CartStatus, updated_by: User) -> Cart:
+        """Update the status of a cart."""
+        logger.info("Updating cart id=%s status to %s", cart_id, status.value)
+        cart = self.get_cart(cart_id)
+        
+        # Validate status transitions
+        if cart.status == CartStatus.COMPLETED and status != CartStatus.COMPLETED:
+            logger.warning("Cannot change status of completed cart id=%s", cart_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot change status of a completed cart",
+            )
+        
+        if cart.status == CartStatus.DELETED and status != CartStatus.DELETED:
+            logger.warning("Cannot change status of deleted cart id=%s", cart_id)
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot change status of a deleted cart",
+            )
+        
+        updated = self._cart_repo.update_status(cart.id, status, updated_by.id)
+        if not updated:
+            logger.warning("Cart id=%s not found for status update", cart_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cart with id={cart_id} not found",
+            )
+        logger.info("Cart id=%s status updated to %s", cart_id, status.value)
+        return updated
+
+    def complete_cart(self, cart_id: int, updated_by: User) -> Cart:
+        """Mark a cart as completed."""
+        return self.update_cart_status(cart_id, CartStatus.COMPLETED, updated_by)
+
+    def delete_cart(self, cart_id: int, updated_by: User) -> Cart:
+        """Mark a cart as deleted (soft delete)."""
+        return self.update_cart_status(cart_id, CartStatus.DELETED, updated_by)
+
+    def get_sales_report(self, start_date: str, end_date: str) -> list[dict]:
+        """Get a sales report for the given date range."""
+        logger.info("Generating sales report from %s to %s", start_date, end_date)
+        return self._cart_repo.list_completed_by_date_range(start_date, end_date)
+
     # ------------------------------------------------------------------
     # Cart item management
     # ------------------------------------------------------------------
@@ -63,6 +115,7 @@ class CartService:
         """Add an item to a cart and ensure it is unique."""
         logger.info("Adding item id=%s to cart id=%s", data.item_id, cart_id)
         cart = self.get_cart(cart_id)
+        self._ensure_cart_editable(cart)
         item = self._get_item(data.item_id)
         stock = self._get_stock(item.id)
 
@@ -85,7 +138,10 @@ class CartService:
             quantity=float(data.quantity),
             created_by=user.id,
         )
-        self._touch_cart(cart.id, user)
+        # Decrement stock
+        self._stock_repo.adjust_quantity(item.id, -float(data.quantity), user.id)
+
+        self._cart_repo.touch(cart.id, user.id)
         logger.info("Cart item added id=%s", created.id)
         return created
 
@@ -95,32 +151,137 @@ class CartService:
         """Update a cart item's quantity or delete when quantity is zero."""
         logger.info("Updating cart item id=%s in cart id=%s", cart_item_id, cart_id)
         cart = self.get_cart(cart_id)
+        self._ensure_cart_editable(cart)
         cart_item = self._get_cart_item(cart.id, cart_item_id)
 
         if data.quantity == 0:
+            # Increment stock back
+            self._stock_repo.adjust_quantity(cart_item.item_id, float(cart_item.quantity), user.id)
             self._cart_repo.delete_cart_item(cart_item.id)
-            self._touch_cart(cart.id, user)
+            self._cart_repo.touch(cart.id, user.id)
             logger.info("Cart item removed id=%s", cart_item.id)
             return None
 
-        stock = self._get_stock(cart_item.item_id)
-        self._ensure_stock_available(stock, data.quantity)
+        # Calculate delta
+        delta = data.quantity - cart_item.quantity
+        if delta > 0:
+            stock = self._get_stock(cart_item.item_id)
+            self._ensure_stock_available(stock, delta)
 
         updated = self._cart_repo.update_cart_item_quantity(
-            cart_item.id, float(data.quantity), updated_by=user.id
+            cart_item.id, data.quantity, updated_by=user.id
         )
-        self._touch_cart(cart.id, user)
+        # Adjust stock
+        self._stock_repo.adjust_quantity(cart_item.item_id, -float(delta), user.id)
+
+        self._cart_repo.touch(cart.id, user.id)
         logger.info("Cart item updated id=%s", cart_item.id)
         return updated  # type: ignore[return-value]
 
     def clear_cart(self, cart_id: int, user: User) -> int:
-        """Remove all cart items for the given cart."""
+        """Remove all cart items for the given cart and increment stock."""
         logger.info("Clearing cart id=%s", cart_id)
         cart = self.get_cart(cart_id)
+        self._ensure_cart_editable(cart)
+        cart_items = self._cart_repo.list_cart_items_by_cart(cart.id)
+        
+        for ci in cart_items:
+            self._stock_repo.adjust_quantity(ci.item_id, float(ci.quantity), user.id)
+
         cleared = self._cart_repo.clear_cart_items(cart.id)
-        self._touch_cart(cart.id, user)
+        self._cart_repo.touch(cart.id, user.id)
         logger.info("Cleared %s items from cart id=%s", cleared, cart.id)
         return cleared
+
+    def return_item(
+        self, cart_id: int, cart_item_id: int, data: CartItemReturn, user: User
+    ) -> CartItem | None:
+        """
+        Return a cart item (partial or full return).
+        
+        If quantity is not provided, performs a full return.
+        If quantity is provided, performs a partial return and updates the cart item.
+        Returns None if the item was fully removed, or the updated CartItem if partial.
+        """
+        logger.info(
+            "Returning cart item id=%s from cart id=%s (quantity=%s)",
+            cart_item_id,
+            cart_id,
+            data.quantity,
+        )
+        
+        # Validate cart exists first
+        cart = self.get_cart(cart_id)
+        self._ensure_cart_editable(cart)
+        
+        # Validate cart item exists and belongs to the cart
+        cart_item = self._cart_repo.get_cart_item_by_id(cart_item_id)
+        if not cart_item:
+            logger.warning("Cart item id=%s not found", cart_item_id)
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cart item with id={cart_item_id} not found",
+            )
+        
+        if cart_item.cart_id != cart_id:
+            logger.warning(
+                "Cart item id=%s does not belong to cart id=%s",
+                cart_item_id,
+                cart_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cart item with id={cart_item_id} not found in cart {cart_id}",
+            )
+        
+        # Determine return quantity
+        return_quantity = data.quantity if data.quantity is not None else cart_item.quantity
+        
+        # Validate return quantity
+        if return_quantity <= Decimal("0"):
+            logger.warning("Invalid return quantity: %s", return_quantity)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Return quantity must be greater than 0",
+            )
+        
+        if return_quantity > cart_item.quantity:
+            logger.warning(
+                "Cannot return more than available (requested: %s, available: %s)",
+                return_quantity,
+                cart_item.quantity,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Cannot return {return_quantity} when only {cart_item.quantity} is in cart",
+            )
+        
+        # Increment stock
+        self._stock_repo.adjust_quantity(
+            cart_item.item_id, float(return_quantity), user.id
+        )
+        
+        # Calculate new quantity
+        new_quantity = cart_item.quantity - return_quantity
+        
+        if new_quantity == Decimal("0"):
+            # Full return - delete the cart item
+            self._cart_repo.delete_cart_item(cart_item.id)
+            self._cart_repo.touch(cart.id, user.id)
+            logger.info("Cart item fully returned and removed id=%s", cart_item.id)
+            return None
+        else:
+            # Partial return - update the cart item quantity
+            updated = self._cart_repo.update_cart_item_quantity(
+                cart_item.id, new_quantity, updated_by=user.id
+            )
+            self._cart_repo.touch(cart.id, user.id)
+            logger.info(
+                "Cart item partially returned id=%s, new quantity=%s",
+                cart_item.id,
+                new_quantity,
+            )
+            return updated  # type: ignore[return-value]
 
     def list_cart_items(self, cart_id: int) -> list[CartItem]:
         """List all items currently in a cart."""
@@ -159,6 +320,7 @@ class CartService:
 
             line = self._calculate_line(item, cart_item.quantity)
             line_items.append({
+                "id": cart_item.id,
                 "item_id": item.id,
                 "name": item.name,
                 "sku": item.sku,
@@ -300,6 +462,7 @@ class CartService:
         """Update cart metadata such as the desk number."""
         logger.info("Updating cart id=%s", cart_id)
         cart = self.get_cart(cart_id)
+        self._ensure_cart_editable(cart)
 
         # Check for duplicate desk_number if one is being assigned
         if data.desk_number is not None:
@@ -325,8 +488,3 @@ class CartService:
         """Return carts that have a desk number assigned."""
         logger.info("Listing carts with desk_number")
         return self._cart_repo.list_with_desk_number()
-
-    def _touch_cart(self, cart_id: int, user: User) -> None:
-        """Update the cart's updated_at timestamp by clearing desk_number."""
-        logger.trace("Touching cart id=%s", cart_id)
-        self._cart_repo.update_desk_number(cart_id, None, user.id)

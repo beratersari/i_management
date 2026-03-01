@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import logging
 
 from backend.models.category import Category
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class CategoryRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, category_id: int) -> Optional[Category]:
         """Return a category by id or None if missing."""
         logger.trace("Fetching category id=%s", category_id)
@@ -32,6 +34,7 @@ class CategoryRepository:
         ).fetchone()
         return Category.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_name(self, name: str) -> Optional[Category]:
         """Return a category by name or None if missing."""
         logger.trace("Fetching category by name=%s", name)
@@ -40,6 +43,7 @@ class CategoryRepository:
         ).fetchone()
         return Category.from_row(row) if row else None
 
+    @log_db_timing
     def list_all(self) -> list[Category]:
         """Return all categories ordered by sort order and name."""
         logger.trace("Listing categories")
@@ -52,6 +56,7 @@ class CategoryRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(
         self,
         name: str,
@@ -70,6 +75,7 @@ class CategoryRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def update(
         self,
         category_id: int,
@@ -102,6 +108,7 @@ class CategoryRepository:
         )
         return self.get_by_id(category_id)
 
+    @log_db_timing
     def delete(self, category_id: int) -> bool:
         """Delete a category and return True if removed."""
         logger.info("Deleting category record id=%s", category_id)

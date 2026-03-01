@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import logging
 
 from backend.models.item import Item
+from backend.core.logging_config import log_db_timing
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class ItemRepository:
     # Read
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def get_by_id(self, item_id: int) -> Optional[Item]:
         """Return an item by id or None if missing."""
         logger.trace("Fetching item id=%s", item_id)
@@ -32,6 +34,7 @@ class ItemRepository:
         ).fetchone()
         return Item.from_row(row) if row else None
 
+    @log_db_timing
     def get_by_sku(self, sku: str) -> Optional[Item]:
         """Return an item by SKU or None if missing."""
         logger.trace("Fetching item by sku=%s", sku)
@@ -40,6 +43,7 @@ class ItemRepository:
         ).fetchone()
         return Item.from_row(row) if row else None
 
+    @log_db_timing
     def list_all(self, category_id: Optional[int] = None) -> list[Item]:
         """Return items, optionally filtered by category."""
         logger.trace("Listing items category_id=%s", category_id)
@@ -54,6 +58,7 @@ class ItemRepository:
             ).fetchall()
         return [Item.from_row(r) for r in rows]
 
+    @log_db_timing
     def search_by_name(self, query: str) -> list[Item]:
         """Search items by name (case-insensitive)."""
         logger.trace("Searching items query=%s", query)
@@ -67,6 +72,7 @@ class ItemRepository:
     # Write
     # ------------------------------------------------------------------
 
+    @log_db_timing
     def create(
         self,
         category_id: int,
@@ -101,6 +107,7 @@ class ItemRepository:
         )
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
+    @log_db_timing
     def update(self, item_id: int, **fields) -> Optional[Item]:
         """Update item fields and return the updated row."""
         if not fields:
@@ -116,6 +123,7 @@ class ItemRepository:
         )
         return self.get_by_id(item_id)
 
+    @log_db_timing
     def delete(self, item_id: int) -> bool:
         """Delete an item by id and return True if removed."""
         logger.info("Deleting item record id=%s", item_id)

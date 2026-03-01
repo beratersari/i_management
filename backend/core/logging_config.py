@@ -4,11 +4,15 @@ Creates file and console handlers with support for TRACE/INFO/WARNING/ERROR leve
 """
 from __future__ import annotations
 
+import functools
 import logging
 import os
-from typing import Optional
+import time
+from typing import Callable, Optional, TypeVar
 
 from backend.core.config import settings
+
+F = TypeVar("F", bound=Callable[..., any])
 
 TRACE_LEVEL = 5
 logging.addLevelName(TRACE_LEVEL, "TRACE")
@@ -92,3 +96,51 @@ def configure_logging() -> None:
 
     root_logger.addHandler(console_handler)
     root_logger.addHandler(file_handler)
+
+
+def log_db_timing(func: F) -> F:
+    """
+    Decorator to log the execution time of database operations.
+    Logs the function name, arguments (excluding 'self' and 'conn'),
+    and the duration in milliseconds.
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        # Get logger from the class instance (first arg is 'self')
+        logger = logging.getLogger(func.__module__)
+        
+        # Build args string (skip 'self' and 'conn' for cleaner logs)
+        arg_parts = []
+        if len(args) > 1:
+            # Skip 'self' (args[0]) and 'conn' if present (args[1] is often conn)
+            display_args = args[2:] if len(args) > 2 else args[1:]
+            for arg in display_args:
+                arg_parts.append(str(arg))
+        for key, value in kwargs.items():
+            arg_parts.append(f"{key}={value}")
+        args_str = ", ".join(arg_parts) if arg_parts else ""
+        
+        start_time = time.perf_counter()
+        try:
+            result = func(*args, **kwargs)
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.info(
+                "DB_OP | %s.%s | duration=%.3fms | args=(%s)",
+                func.__qualname__,
+                func.__name__,
+                elapsed_ms,
+                args_str
+            )
+            return result
+        except Exception as e:
+            elapsed_ms = (time.perf_counter() - start_time) * 1000
+            logger.error(
+                "DB_OP | %s.%s | duration=%.3fms | args=(%s) | error=%s",
+                func.__qualname__,
+                func.__name__,
+                elapsed_ms,
+                args_str,
+                str(e)
+            )
+            raise
+    return wrapper  # type: ignore[return-value]

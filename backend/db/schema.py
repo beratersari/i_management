@@ -106,6 +106,8 @@ CREATE_CARTS_TABLE = """
 CREATE TABLE IF NOT EXISTS carts (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     desk_number  TEXT    UNIQUE,
+    status       TEXT    NOT NULL DEFAULT 'draft'
+                          CHECK(status IN ('draft', 'deleted', 'completed')),
     created_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     updated_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE SET NULL,
     created_at   TEXT    NOT NULL DEFAULT (datetime('now')),
@@ -201,6 +203,7 @@ MIGRATIONS = [
     ("menu_items", "description", "ALTER TABLE menu_items ADD COLUMN description TEXT"),
     ("menu_items", "allergens", "ALTER TABLE menu_items ADD COLUMN allergens TEXT"),
     ("carts", "desk_number", "ALTER TABLE carts ADD COLUMN desk_number TEXT"),
+    ("carts", "status", "ALTER TABLE carts ADD COLUMN status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'deleted', 'completed'))"),
 ]
 
 # ---------------------------------------------------------------------------
