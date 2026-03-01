@@ -7,7 +7,6 @@ Business rules enforced here:
 - Soft delete: rows are never physically removed; is_deleted=1 is set instead.
 """
 import sqlite3
-from typing import Optional
 import logging
 
 from fastapi import HTTPException, status
@@ -21,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
+    """Business logic for user lifecycle operations."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize the repository used for user operations."""
         logger.trace("Initializing UserService")
         self._repo = UserRepository(conn)
 
@@ -42,6 +44,7 @@ class UserService:
         return user
 
     def list_users(self, include_deleted: bool = False) -> list[User]:
+        """Return users, optionally including soft-deleted accounts."""
         logger.info("Listing users include_deleted=%s", include_deleted)
         return self._repo.list_all(include_deleted=include_deleted)
 
@@ -100,6 +103,7 @@ class UserService:
     # ------------------------------------------------------------------
 
     def update_user(self, user_id: int, data: UserUpdate, updated_by: User) -> User:
+        """Update user fields after enforcing role-based rules."""
         logger.info("Updating user id=%s", user_id)
         target = self.get_user(user_id)  # raises 404 if not found / deleted
 
@@ -160,15 +164,7 @@ class UserService:
     # ------------------------------------------------------------------
 
     def delete_user(self, user_id: int, deleted_by: User) -> None:
-        """
-        Soft-delete a user (sets is_deleted=1, is_active=0, records deleted_at).
-        The row is never physically removed from the database.
-
-        Rules:
-        - Admins can soft-delete any non-deleted user.
-        - Market owners can only soft-delete employees (role='employee').
-        - A user can soft-delete their own account.
-        """
+        """Soft-delete a user after enforcing role-based rules."""
         logger.info("Deleting user id=%s", user_id)
         target = self.get_user(user_id)  # raises 404 if already deleted
 

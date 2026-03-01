@@ -223,6 +223,7 @@ ALL_TABLES = [
 
 
 def _column_exists(conn, table: str, column: str) -> bool:
+    """Return True when a column exists in the given table."""
     logger.trace("Checking column existence table=%s column=%s", table, column)
     rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
     return any(r["name"] == column for r in rows)

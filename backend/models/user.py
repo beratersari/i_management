@@ -29,6 +29,7 @@ class User:
     deleted_at: Optional[datetime] = None
 
     def __post_init__(self) -> None:
+        """Log the creation of the User model instance."""
         import logging
 
         logger = logging.getLogger(__name__)

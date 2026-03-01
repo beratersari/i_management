@@ -11,11 +11,15 @@ from typing import Optional
 # ---------------------------------------------------------------------------
 
 class CategoryCreate(BaseModel):
+    """Payload for creating categories."""
+
     name: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
 
 
 class CategoryUpdate(BaseModel):
+    """Payload for updating categories."""
+
     name: Optional[str] = Field(None, min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=500)
     sort_order: Optional[int] = Field(None, ge=0)
@@ -26,6 +30,8 @@ class CategoryUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class CategoryResponse(BaseModel):
+    """Response model for category data."""
+
     id: int
     name: str
     description: Optional[str]

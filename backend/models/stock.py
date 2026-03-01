@@ -7,7 +7,6 @@ An item can only have ONE stock entry (item_id is UNIQUE in the table).
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 
 
 @dataclass
@@ -21,6 +20,7 @@ class StockEntry:
     updated_at: datetime
 
     def __post_init__(self) -> None:
+        """Log the creation of the StockEntry model instance."""
         import logging
 
         logger = logging.getLogger(__name__)

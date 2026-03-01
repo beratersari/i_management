@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class TokenRepository:
+    """Data access layer for refresh token records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing TokenRepository")
         self._conn = conn
 
@@ -22,6 +25,7 @@ class TokenRepository:
     # ------------------------------------------------------------------
 
     def get_by_token(self, token: str) -> Optional[RefreshToken]:
+        """Return the refresh token row for the given token string."""
         logger.trace("Fetching refresh token record")
         row = self._conn.execute(
             "SELECT * FROM refresh_tokens WHERE token = ?", (token,)
@@ -33,6 +37,7 @@ class TokenRepository:
     # ------------------------------------------------------------------
 
     def create(self, user_id: int, token: str, expires_at: datetime) -> RefreshToken:
+        """Insert a refresh token row and return it."""
         logger.info("Creating refresh token for user id=%s", user_id)
         cursor = self._conn.execute(
             """
@@ -47,7 +52,7 @@ class TokenRepository:
         return RefreshToken.from_row(row)
 
     def revoke(self, token: str) -> bool:
-        """Mark a single token as revoked."""
+        """Mark a single token as revoked and return True if updated."""
         logger.info("Revoking refresh token")
         cursor = self._conn.execute(
             "UPDATE refresh_tokens SET revoked = 1 WHERE token = ?", (token,)
@@ -56,7 +61,7 @@ class TokenRepository:
         return cursor.rowcount > 0
 
     def revoke_all_for_user(self, user_id: int) -> int:
-        """Revoke every active refresh token for a user (e.g. on logout-all)."""
+        """Revoke all active refresh tokens for a user and return count."""
         logger.info("Revoking all refresh tokens for user id=%s", user_id)
         cursor = self._conn.execute(
             "UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND revoked = 0",
@@ -66,7 +71,7 @@ class TokenRepository:
         return cursor.rowcount
 
     def delete_expired(self) -> int:
-        """Housekeeping: remove tokens that have already expired."""
+        """Delete expired refresh tokens and return the count removed."""
         now = datetime.now(tz=timezone.utc).isoformat()
         logger.info("Deleting expired refresh tokens")
         cursor = self._conn.execute(

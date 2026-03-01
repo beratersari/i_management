@@ -15,6 +15,7 @@ class RefreshToken:
     created_at: datetime
 
     def __post_init__(self) -> None:
+        """Log the creation of the RefreshToken model instance."""
         import logging
 
         logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ class RefreshToken:
 
     @classmethod
     def from_row(cls, row) -> "RefreshToken":
+        """Build a RefreshToken from a sqlite3.Row object."""
         import logging
 
         logger = logging.getLogger(__name__)

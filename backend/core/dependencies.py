@@ -97,6 +97,7 @@ def require_roles(*roles: UserRole):
             ...
     """
     def _check(current_user: User = Depends(get_current_active_user)) -> User:
+        """Validate the current user has one of the required roles."""
         if current_user.role not in roles:
             logger.warning(
                 "User id=%s lacks required roles: %s",

@@ -13,6 +13,8 @@ from pydantic import BaseModel, Field
 # ---------------------------------------------------------------------------
 
 class MenuItemCreate(BaseModel):
+    """Payload for adding menu items."""
+
     item_id: int = Field(..., gt=0, description="Existing item ID to add to the menu")
     display_name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
@@ -24,6 +26,8 @@ class MenuItemCreate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class MenuItemResponse(BaseModel):
+    """Response model for menu items."""
+
     id: int
     item_id: int
     display_name: str
@@ -37,6 +41,8 @@ class MenuItemResponse(BaseModel):
 
 
 class MenuItemPublic(BaseModel):
+    """Public menu item fields used for display."""
+
     display_name: str
     image_url: Optional[str]
     description: Optional[str]
@@ -46,6 +52,8 @@ class MenuItemPublic(BaseModel):
 
 
 class MenuCategoryGroupPublic(BaseModel):
+    """Grouped menu items for public display."""
+
     category_id: int
     category_name: str
     sort_order: int

@@ -11,7 +11,7 @@ import logging
 from fastapi import HTTPException, status
 
 from backend.models.time_entry import TimeEntry, TimeEntryStatus
-from backend.models.user import User, UserRole
+from backend.models.user import User
 from backend.repositories.time_entry_repository import TimeEntryRepository
 from backend.schemas.time_entry import TimeEntryCreate, TimeEntryUpdate, TimeEntryReview
 
@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class TimeEntryService:
+    """Business logic for time entry management and reviews."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize the repository used by the time entry service."""
         logger.trace("Initializing TimeEntryService")
         self._conn = conn
         self._repo = TimeEntryRepository(conn)
@@ -29,6 +32,7 @@ class TimeEntryService:
     # ------------------------------------------------------------------
 
     def get_entry(self, entry_id: int) -> TimeEntry:
+        """Fetch a time entry by id or raise a 404 HTTP exception."""
         logger.info("Fetching time entry id=%s", entry_id)
         entry = self._repo.get_by_id(entry_id)
         if not entry:
@@ -40,9 +44,9 @@ class TimeEntryService:
         return entry
 
     def list_my_entries(
-        self, 
-        user: User, 
-        status_filter: TimeEntryStatus = None
+        self,
+        user: User,
+        status_filter: TimeEntryStatus = None,
     ) -> list[TimeEntry]:
         """List time entries for the current user."""
         logger.info("Listing time entries for user id=%s", user.id)
@@ -54,10 +58,10 @@ class TimeEntryService:
         return self._repo.list_pending()
 
     def list_entries_by_date_range(
-        self, 
-        start_date: date, 
+        self,
+        start_date: date,
         end_date: date,
-        status_filter: TimeEntryStatus = None
+        status_filter: TimeEntryStatus = None,
     ) -> list[TimeEntry]:
         """List entries within a date range."""
         logger.info("Listing time entries from %s to %s", start_date, end_date)
@@ -101,15 +105,12 @@ class TimeEntryService:
     # ------------------------------------------------------------------
 
     def update_entry(
-        self, 
-        entry_id: int, 
-        data: TimeEntryUpdate, 
-        user: User
+        self,
+        entry_id: int,
+        data: TimeEntryUpdate,
+        user: User,
     ) -> TimeEntry:
-        """
-        Update a time entry.
-        Only the owner can update, and only if status is 'pending'.
-        """
+        """Update a pending time entry owned by the user."""
         logger.info("Updating time entry id=%s", entry_id)
         entry = self.get_entry(entry_id)
 
@@ -197,15 +198,12 @@ class TimeEntryService:
     # ------------------------------------------------------------------
 
     def review_entry(
-        self, 
-        entry_id: int, 
-        data: TimeEntryReview, 
-        reviewer: User
+        self,
+        entry_id: int,
+        data: TimeEntryReview,
+        reviewer: User,
     ) -> TimeEntry:
-        """
-        Review a time entry (accept or reject).
-        Only admin or market_owner can review.
-        """
+        """Review a time entry as an admin or market owner."""
         logger.info("Reviewing time entry id=%s", entry_id)
         entry = self.get_entry(entry_id)
 

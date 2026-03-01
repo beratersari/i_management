@@ -33,6 +33,7 @@ class TimeEntry:
     updated_at: datetime
 
     def __post_init__(self) -> None:
+        """Log the creation of the TimeEntry model instance."""
         import logging
 
         logger = logging.getLogger(__name__)

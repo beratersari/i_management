@@ -10,28 +10,24 @@ import logging
 from fastapi import HTTPException, status
 
 from backend.models.cart import Cart
-from backend.models.cart_item import CartItem
 from backend.models.daily_account import DailyAccount
-from backend.models.daily_account_item import DailyAccountItem
-from backend.models.item import Item
 from backend.models.user import User
-from backend.repositories.cart_item_repository import CartItemRepository
 from backend.repositories.cart_repository import CartRepository
 from backend.repositories.daily_account_repository import DailyAccountRepository
-from backend.repositories.daily_account_item_repository import DailyAccountItemRepository
 from backend.repositories.item_repository import ItemRepository
 
 logger = logging.getLogger(__name__)
 
 
 class DailyAccountService:
+    """Business logic for daily account close/open workflows."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize repositories used by the daily account service."""
         logger.trace("Initializing DailyAccountService")
         self._conn = conn
         self._account_repo = DailyAccountRepository(conn)
-        self._account_item_repo = DailyAccountItemRepository(conn)
         self._cart_repo = CartRepository(conn)
-        self._cart_item_repo = CartItemRepository(conn)
         self._item_repo = ItemRepository(conn)
 
     # ------------------------------------------------------------------
@@ -39,6 +35,7 @@ class DailyAccountService:
     # ------------------------------------------------------------------
 
     def get_account(self, account_id: int) -> DailyAccount:
+        """Fetch a daily account by id or raise a 404 HTTP exception."""
         logger.info("Fetching daily account id=%s", account_id)
         account = self._account_repo.get_by_id(account_id)
         if not account:
@@ -50,6 +47,7 @@ class DailyAccountService:
         return account
 
     def get_account_by_date(self, account_date: date) -> DailyAccount:
+        """Fetch a daily account by date or raise a 404 HTTP exception."""
         logger.info("Fetching daily account by date=%s", account_date)
         account = self._account_repo.get_by_date(account_date)
         if not account:
@@ -61,9 +59,10 @@ class DailyAccountService:
         return account
 
     def get_summary(self, account_id: int) -> dict:
+        """Return a daily account summary with items and totals."""
         logger.info("Building daily account summary id=%s", account_id)
         account = self.get_account(account_id)
-        items = self._account_item_repo.list_by_account(account.id)
+        items = self._account_repo.list_items_by_account(account.id)
         totals = {
             "subtotal": account.subtotal,
             "discount_total": account.discount_total,
@@ -77,12 +76,14 @@ class DailyAccountService:
         }
 
     def list_accounts(self, limit: int = 30) -> list[DailyAccount]:
+        """Return recent daily accounts limited by the provided count."""
         logger.info("Listing daily accounts limit=%s", limit)
         return self._account_repo.list_all(limit=limit)
 
     def list_accounts_by_range(
         self, start_date: date, end_date: date
     ) -> list[DailyAccount]:
+        """Return daily accounts within the provided date range."""
         logger.info("Listing daily accounts from %s to %s", start_date, end_date)
         return self._account_repo.list_by_date_range(start_date, end_date)
 
@@ -91,11 +92,7 @@ class DailyAccountService:
     # ------------------------------------------------------------------
 
     def close_today(self, user: User) -> DailyAccount:
-        """
-        Close the current day's account.
-        Aggregates all carts created today and calculates totals.
-        Raises 409 if today's account is already closed.
-        """
+        """Close today's account and persist aggregated totals."""
         logger.info("Closing daily account for today user_id=%s", user.id)
         today = date.today()
         existing = self._account_repo.get_by_date(today)
@@ -135,7 +132,7 @@ class DailyAccountService:
                 updated_by=user.id,
             )
             # Clear old items and re-create
-            self._account_item_repo.delete_by_account(existing.id)
+            self._account_repo.delete_items_by_account(existing.id)
         else:
             account = self._account_repo.create(
                 account_date=today,
@@ -150,7 +147,7 @@ class DailyAccountService:
 
         # Store aggregated items
         for item_data in aggregated_items:
-            self._account_item_repo.create(
+            self._account_repo.create_item(
                 account_id=account.id,
                 item_id=item_data["item_id"],
                 item_name=item_data["name"],
@@ -171,9 +168,7 @@ class DailyAccountService:
         return closed_account  # type: ignore[return-value]
 
     def open_account(self, account_id: int, user: User) -> DailyAccount:
-        """
-        Reopen a closed daily account (admin or market_owner only).
-        """
+        """Reopen a closed daily account."""
         logger.info("Opening daily account id=%s", account_id)
         account = self.get_account(account_id)
 
@@ -189,9 +184,7 @@ class DailyAccountService:
         return opened_account  # type: ignore[return-value]
 
     def close_by_date(self, account_date: date, user: User) -> DailyAccount:
-        """
-        Close a specific date's account (admin or market_owner only).
-        """
+        """Close a specific date's daily account."""
         logger.info("Closing daily account date=%s", account_date)
         existing = self._account_repo.get_by_date(account_date)
 
@@ -229,7 +222,7 @@ class DailyAccountService:
                 items_count=len(aggregated_items),
                 updated_by=user.id,
             )
-            self._account_item_repo.delete_by_account(existing.id)
+            self._account_repo.delete_items_by_account(existing.id)
         else:
             account = self._account_repo.create(
                 account_date=account_date,
@@ -244,7 +237,7 @@ class DailyAccountService:
 
         # Store aggregated items
         for item_data in aggregated_items:
-            self._account_item_repo.create(
+            self._account_repo.create_item(
                 account_id=account.id,
                 item_id=item_data["item_id"],
                 item_name=item_data["name"],
@@ -264,9 +257,7 @@ class DailyAccountService:
         return closed_account  # type: ignore[return-value]
 
     def open_by_date(self, account_date: date, user: User) -> DailyAccount:
-        """
-        Reopen a specific date's account (admin or market_owner only).
-        """
+        """Reopen a specific date's daily account."""
         logger.info("Opening daily account date=%s", account_date)
         account = self._account_repo.get_by_date(account_date)
         if not account:
@@ -294,12 +285,9 @@ class DailyAccountService:
     def get_item_sales_by_date_range(
         self, item_id: int, start_date: date, end_date: date
     ) -> dict:
-        """
-        Get sales statistics for a specific item within a date range.
-        Example: How many bananas sold between 2024-01-01 and 2024-01-31
-        """
+        """Return item sales stats for the provided date range."""
         logger.info("Getting item sales item_id=%s", item_id)
-        return self._account_item_repo.get_item_sales_by_date_range(
+        return self._account_repo.get_item_sales_by_date_range(
             item_id=item_id,
             start_date=start_date.isoformat(),
             end_date=end_date.isoformat(),
@@ -308,11 +296,9 @@ class DailyAccountService:
     def get_top_sellers(
         self, start_date: date, end_date: date, limit: int = 10
     ) -> list[dict]:
-        """
-        Get top selling items within a date range.
-        """
+        """Return top selling items for the provided date range."""
         logger.info("Getting top sellers from %s to %s", start_date, end_date)
-        return self._account_item_repo.get_top_sellers(
+        return self._account_repo.get_top_sellers(
             start_date=start_date.isoformat(),
             end_date=end_date.isoformat(),
             limit=limit,
@@ -321,11 +307,9 @@ class DailyAccountService:
     def get_sales_by_category(
         self, start_date: date, end_date: date
     ) -> list[dict]:
-        """
-        Get sales aggregated by category within a date range.
-        """
+        """Return category sales aggregates for the provided date range."""
         logger.info("Getting sales by category from %s to %s", start_date, end_date)
-        return self._account_item_repo.get_sales_by_category(
+        return self._account_repo.get_sales_by_category(
             start_date=start_date.isoformat(),
             end_date=end_date.isoformat(),
         )
@@ -335,6 +319,7 @@ class DailyAccountService:
     # ------------------------------------------------------------------
 
     def _get_todays_carts(self) -> list[Cart]:
+        """Return carts created during the current UTC day."""
         today_start = datetime.now(tz=timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
@@ -445,6 +430,7 @@ class DailyAccountService:
         return list(aggregated.values())
 
     def _calculate_totals(self, items: list[dict]) -> dict:
+        """Calculate aggregated totals for a list of line items."""
         logger.trace("Calculating daily account totals")
         subtotal = sum(item["line_subtotal"] for item in items)
         discount_total = sum(item["line_discount"] for item in items)
@@ -459,5 +445,6 @@ class DailyAccountService:
         }
 
     def _money(self, value: Decimal) -> Decimal:
+        """Quantize decimal values to two decimal places."""
         logger.trace("Quantizing decimal value")
         return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

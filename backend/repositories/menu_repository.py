@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class MenuRepository:
+    """Data access layer for menu item records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing MenuRepository")
         self._conn = conn
 
@@ -22,6 +25,7 @@ class MenuRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, menu_item_id: int) -> Optional[MenuItem]:
+        """Return a menu item by id or None if missing."""
         logger.trace("Fetching menu item id=%s", menu_item_id)
         row = self._conn.execute(
             "SELECT * FROM menu_items WHERE id = ?", (menu_item_id,)
@@ -29,6 +33,7 @@ class MenuRepository:
         return MenuItem.from_row(row) if row else None
 
     def get_by_item_id(self, item_id: int) -> Optional[MenuItem]:
+        """Return the menu item for a given item id, if present."""
         logger.trace("Fetching menu item item_id=%s", item_id)
         row = self._conn.execute(
             "SELECT * FROM menu_items WHERE item_id = ?", (item_id,)
@@ -36,6 +41,7 @@ class MenuRepository:
         return MenuItem.from_row(row) if row else None
 
     def list_all(self) -> list[MenuItem]:
+        """Return all menu items ordered by item id."""
         logger.trace("Listing menu items")
         rows = self._conn.execute(
             "SELECT * FROM menu_items ORDER BY item_id"
@@ -138,6 +144,7 @@ class MenuRepository:
         allergens: Optional[str],
         created_by: int,
     ) -> MenuItem:
+        """Insert a menu item row and return it."""
         logger.info("Creating menu item item_id=%s", item_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
@@ -153,6 +160,7 @@ class MenuRepository:
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
     def delete(self, item_id: int) -> bool:
+        """Delete a menu item by item id and return True if removed."""
         logger.info("Deleting menu item item_id=%s", item_id)
         cursor = self._conn.execute(
             "DELETE FROM menu_items WHERE item_id = ?", (item_id,)

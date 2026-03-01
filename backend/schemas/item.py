@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class ItemCreate(BaseModel):
+    """Payload for creating items."""
+
     category_id: int = Field(..., gt=0)
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
@@ -29,6 +31,7 @@ class ItemCreate(BaseModel):
     @field_validator("unit_price", "tax_rate", "discount_rate", mode="before")
     @classmethod
     def validate_decimal(cls, v):
+        """Normalize decimal inputs to Decimal instances."""
         logger.trace("Validating item decimal value")
         if v is None:
             return v
@@ -36,6 +39,8 @@ class ItemCreate(BaseModel):
 
 
 class ItemUpdate(BaseModel):
+    """Payload for updating items."""
+
     category_id: Optional[int] = Field(None, gt=0)
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
@@ -50,6 +55,7 @@ class ItemUpdate(BaseModel):
     @field_validator("unit_price", "tax_rate", "discount_rate", mode="before")
     @classmethod
     def validate_decimal(cls, v):
+        """Normalize decimal inputs to Decimal instances."""
         logger.trace("Validating item decimal value")
         if v is None:
             return v
@@ -61,6 +67,8 @@ class ItemUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ItemResponse(BaseModel):
+    """Response model for item data."""
+
     id: int
     category_id: int
     name: str

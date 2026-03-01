@@ -13,6 +13,8 @@ from pydantic import BaseModel
 # ---------------------------------------------------------------------------
 
 class DailyAccountItemResponse(BaseModel):
+    """Response model for daily-account line items."""
+
     id: int
     account_id: int
     item_id: int
@@ -32,6 +34,8 @@ class DailyAccountItemResponse(BaseModel):
 
 
 class DailyAccountTotals(BaseModel):
+    """Aggregate totals for a daily account."""
+
     subtotal: Decimal
     discount_total: Decimal
     tax_total: Decimal
@@ -39,6 +43,8 @@ class DailyAccountTotals(BaseModel):
 
 
 class DailyAccountResponse(BaseModel):
+    """Response model for daily-account summary metadata."""
+
     id: int
     account_date: date
     subtotal: Decimal
@@ -59,6 +65,8 @@ class DailyAccountResponse(BaseModel):
 
 
 class DailyAccountSummaryResponse(BaseModel):
+    """Bundled response for daily account details and totals."""
+
     account: DailyAccountResponse
     items: list[DailyAccountItemResponse]
     totals: DailyAccountTotals
@@ -69,6 +77,8 @@ class DailyAccountSummaryResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ItemSalesResponse(BaseModel):
+    """Response payload for item sales analytics."""
+
     item_id: int
     total_quantity: float
     total_revenue: float
@@ -77,6 +87,8 @@ class ItemSalesResponse(BaseModel):
 
 
 class TopSellerResponse(BaseModel):
+    """Response payload for top-selling items."""
+
     item_id: int
     item_name: str
     sku: Optional[str]
@@ -86,6 +98,8 @@ class TopSellerResponse(BaseModel):
 
 
 class CategorySalesResponse(BaseModel):
+    """Response payload for category-level sales analytics."""
+
     category_id: int
     category_name: str
     total_quantity: float

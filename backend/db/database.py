@@ -1,7 +1,10 @@
-import sqlite3
-import os
+"""Database connection helpers and initialization."""
+
 import logging
+import os
+import sqlite3
 from contextlib import contextmanager
+
 from backend.core.config import settings
 
 logger = logging.getLogger(__name__)

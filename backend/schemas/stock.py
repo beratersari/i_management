@@ -16,22 +16,34 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class StockCreate(BaseModel):
-    item_id: int = Field(..., gt=0, description="ID of the item to add to stock")
-    quantity: Decimal = Field(..., ge=0, decimal_places=3, description="Initial quantity on hand")
+    """Payload for adding items to stock."""
+
+    item_id: int = Field(
+        ..., gt=0, description="ID of the item to add to stock"
+    )
+    quantity: Decimal = Field(
+        ..., ge=0, decimal_places=3, description="Initial quantity on hand"
+    )
 
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        """Coerce numeric inputs into Decimal values."""
         logger.trace("Coercing stock decimal value")
         return Decimal(str(v)) if v is not None else v
 
 
 class StockUpdate(BaseModel):
-    quantity: Decimal = Field(..., ge=0, decimal_places=3, description="New quantity on hand")
+    """Payload for updating stock quantities."""
+
+    quantity: Decimal = Field(
+        ..., ge=0, decimal_places=3, description="New quantity on hand"
+    )
 
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        """Coerce numeric inputs into Decimal values."""
         logger.trace("Coercing stock decimal value")
         return Decimal(str(v)) if v is not None else v
 
@@ -41,6 +53,8 @@ class StockUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class StockEntryResponse(BaseModel):
+    """Response model for stock entry data."""
+
     id: int
     item_id: int
     quantity: Decimal
@@ -54,6 +68,7 @@ class StockEntryResponse(BaseModel):
 
 class StockItemSummary(BaseModel):
     """Flat item row used inside a grouped-by-category response."""
+
     stock_entry_id: int
     item_id: int
     item_name: str
@@ -65,6 +80,7 @@ class StockItemSummary(BaseModel):
 
 class StockCategoryGroup(BaseModel):
     """One category bucket returned by the grouped stock endpoint."""
+
     category_id: int
     category_name: str
     items: list[StockItemSummary]

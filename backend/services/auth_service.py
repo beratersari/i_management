@@ -24,7 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
+    """Business logic for authentication and token lifecycle."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize repositories used by the service."""
         logger.trace("Initializing AuthService")
         self._user_repo = UserRepository(conn)
         self._token_repo = TokenRepository(conn)
@@ -34,10 +37,7 @@ class AuthService:
     # ------------------------------------------------------------------
 
     def login(self, username: str, password: str) -> Token:
-        """
-        Validate credentials and issue a new access + refresh token pair.
-        Accepts either username or email in the *username* field.
-        """
+        """Validate credentials and issue an access/refresh token pair."""
         logger.info("Authenticating user '%s'", username)
         user = (
             self._user_repo.get_by_username(username)
@@ -67,11 +67,7 @@ class AuthService:
     # ------------------------------------------------------------------
 
     def refresh(self, refresh_token_str: str) -> AccessToken:
-        """
-        Validate the refresh token and issue a new access token.
-        The refresh token is NOT rotated here (single-use rotation can be
-        added later by revoking the old token and issuing a new one).
-        """
+        """Validate a refresh token and issue a new access token."""
         invalid_exc = HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
@@ -129,6 +125,7 @@ class AuthService:
     # ------------------------------------------------------------------
 
     def _issue_token_pair(self, user: User) -> Token:
+        """Create and persist an access/refresh token pair for a user."""
         access_token = create_access_token(user.id, user.role.value)
         refresh_token_str = create_refresh_token(user.id, user.role.value)
 

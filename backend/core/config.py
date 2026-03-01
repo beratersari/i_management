@@ -1,11 +1,14 @@
-from pydantic_settings import BaseSettings
-from pydantic import field_validator
+"""Application configuration loaded via pydantic settings."""
+
 from typing import List
 import secrets
-import os
+
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
+    """Strongly-typed application settings with environment overrides."""
+
     # Application
     APP_NAME: str = "Cafe & Greengrocer Stock Tracker"
     APP_VERSION: str = "0.1.0"
@@ -30,6 +33,8 @@ class Settings(BaseSettings):
     LOG_TRACE_CALLS: bool = True
 
     class Config:
+        """Configure environment file loading behavior."""
+
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True

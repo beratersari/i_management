@@ -15,6 +15,7 @@ logging.addLevelName(TRACE_LEVEL, "TRACE")
 
 
 def trace(self: logging.Logger, message: str, *args, **kwargs) -> None:
+    """Emit a TRACE-level message on the logger instance."""
     if self.isEnabledFor(TRACE_LEVEL):
         self._log(TRACE_LEVEL, message, args, **kwargs)
 
@@ -23,15 +24,20 @@ logging.Logger.trace = trace  # type: ignore[attr-defined]
 
 
 class LogLevelFilter(logging.Filter):
+    """Filter log records to an allowed set of levels."""
+
     def __init__(self, allowed_levels: set[int]) -> None:
+        """Initialize the filter with the accepted level numbers."""
         super().__init__()
         self._allowed_levels = allowed_levels
 
     def filter(self, record: logging.LogRecord) -> bool:
+        """Return True when the record level is allowed."""
         return record.levelno in self._allowed_levels
 
 
 def _parse_allowed_levels() -> set[int]:
+    """Parse the configured log levels into numeric values."""
     default_levels = {TRACE_LEVEL, logging.INFO, logging.WARNING, logging.ERROR}
     raw = settings.LOG_LEVELS
     if not raw:
@@ -52,6 +58,7 @@ def _parse_allowed_levels() -> set[int]:
 
 
 def _resolve_level(level_name: Optional[str]) -> int:
+    """Resolve the configured log level string to its numeric value."""
     if not level_name:
         return logging.INFO
     normalized = level_name.strip().upper()

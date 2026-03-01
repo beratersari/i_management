@@ -3,7 +3,6 @@ Item management service.
 Any authenticated user can create, update, and delete items.
 """
 import sqlite3
-from decimal import Decimal
 from typing import Optional
 import logging
 
@@ -19,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class ItemService:
+    """Business logic for item operations."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize repositories used by the item service."""
         logger.trace("Initializing ItemService")
         self._repo = ItemRepository(conn)
         self._category_repo = CategoryRepository(conn)
@@ -29,6 +31,7 @@ class ItemService:
     # ------------------------------------------------------------------
 
     def get_item(self, item_id: int) -> Item:
+        """Fetch an item by id or raise a 404 HTTP exception."""
         logger.info("Fetching item id=%s", item_id)
         item = self._repo.get_by_id(item_id)
         if not item:
@@ -40,10 +43,12 @@ class ItemService:
         return item
 
     def list_items(self, category_id: Optional[int] = None) -> list[Item]:
+        """Return items optionally filtered by category id."""
         logger.info("Listing items category_id=%s", category_id)
         return self._repo.list_all(category_id=category_id)
 
     def search_items(self, query: str) -> list[Item]:
+        """Search for items by name using a case-insensitive query."""
         logger.info("Searching items query=%s", query)
         return self._repo.search_by_name(query)
 
@@ -52,6 +57,7 @@ class ItemService:
     # ------------------------------------------------------------------
 
     def create_item(self, data: ItemCreate, created_by: User) -> Item:
+        """Create a new item after validating category and SKU rules."""
         logger.info("Creating item %s", data.name)
         # Verify category exists
         category = self._category_repo.get_by_id(data.category_id)
@@ -93,6 +99,7 @@ class ItemService:
     # ------------------------------------------------------------------
 
     def update_item(self, item_id: int, data: ItemUpdate, updated_by: User) -> Item:
+        """Update an item after validating category and SKU changes."""
         logger.info("Updating item id=%s", item_id)
         item = self.get_item(item_id)
 
@@ -149,6 +156,7 @@ class ItemService:
     # ------------------------------------------------------------------
 
     def delete_item(self, item_id: int) -> None:
+        """Delete an item and raise 404 if it does not exist."""
         logger.info("Deleting item id=%s", item_id)
         if not self._repo.delete(item_id):
             logger.warning("Item id=%s not found for deletion", item_id)

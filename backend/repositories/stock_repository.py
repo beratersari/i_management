@@ -17,7 +17,10 @@ logger = logging.getLogger(__name__)
 
 
 class StockRepository:
+    """Data access layer for stock entry records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing StockRepository")
         self._conn = conn
 

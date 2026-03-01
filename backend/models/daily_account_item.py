@@ -25,6 +25,7 @@ class DailyAccountItem:
     created_at: datetime
 
     def __post_init__(self) -> None:
+        """Log the creation of the DailyAccountItem model instance."""
         import logging
 
         logger = logging.getLogger(__name__)

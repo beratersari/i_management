@@ -21,7 +21,10 @@ logger = logging.getLogger(__name__)
 
 
 class MenuService:
+    """Business logic for menu item operations."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize repositories used by the menu service."""
         logger.trace("Initializing MenuService")
         self._repo = MenuRepository(conn)
         self._item_repo = ItemRepository(conn)
@@ -31,10 +34,12 @@ class MenuService:
     # ------------------------------------------------------------------
 
     def list_menu_items(self) -> list[dict]:
+        """Return the public menu item list."""
         logger.info("Listing menu items")
         return self._repo.list_public()
 
     def list_grouped_by_category(self) -> list[dict]:
+        """Return public menu items grouped by category."""
         logger.info("Listing menu items grouped by category")
         return self._repo.list_grouped_by_category_public()
 
@@ -43,6 +48,7 @@ class MenuService:
     # ------------------------------------------------------------------
 
     def add_menu_item(self, data: MenuItemCreate, created_by: User) -> MenuItem:
+        """Add an item to the menu after validating it exists."""
         logger.info("Adding menu item item_id=%s", data.item_id)
         item = self._item_repo.get_by_id(data.item_id)
         if not item:
@@ -75,6 +81,7 @@ class MenuService:
     # ------------------------------------------------------------------
 
     def remove_menu_item(self, item_id: int) -> None:
+        """Remove an item from the menu and raise 404 if missing."""
         logger.info("Removing menu item item_id=%s", item_id)
         if not self._repo.delete(item_id):
             logger.warning("Menu item not found for item id=%s", item_id)

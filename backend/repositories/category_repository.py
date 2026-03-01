@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class CategoryRepository:
+    """Data access layer for category records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing CategoryRepository")
         self._conn = conn
 
@@ -22,6 +25,7 @@ class CategoryRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, category_id: int) -> Optional[Category]:
+        """Return a category by id or None if missing."""
         logger.trace("Fetching category id=%s", category_id)
         row = self._conn.execute(
             "SELECT * FROM categories WHERE id = ?", (category_id,)
@@ -29,6 +33,7 @@ class CategoryRepository:
         return Category.from_row(row) if row else None
 
     def get_by_name(self, name: str) -> Optional[Category]:
+        """Return a category by name or None if missing."""
         logger.trace("Fetching category by name=%s", name)
         row = self._conn.execute(
             "SELECT * FROM categories WHERE name = ?", (name,)
@@ -36,6 +41,7 @@ class CategoryRepository:
         return Category.from_row(row) if row else None
 
     def list_all(self) -> list[Category]:
+        """Return all categories ordered by sort order and name."""
         logger.trace("Listing categories")
         rows = self._conn.execute(
             "SELECT * FROM categories ORDER BY sort_order, name"
@@ -52,6 +58,7 @@ class CategoryRepository:
         description: Optional[str],
         created_by: int,
     ) -> Category:
+        """Insert a new category and return the created row."""
         logger.info("Creating category record name=%s", name)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
@@ -71,6 +78,7 @@ class CategoryRepository:
         sort_order: Optional[int] = None,
         updated_by: Optional[int] = None,
     ) -> Optional[Category]:
+        """Update category fields and return the updated row."""
         fields: dict = {}
         if name is not None:
             fields["name"] = name
@@ -95,7 +103,7 @@ class CategoryRepository:
         return self.get_by_id(category_id)
 
     def delete(self, category_id: int) -> bool:
-        """Delete a category. Will fail if items reference this category (ON DELETE RESTRICT)."""
+        """Delete a category and return True if removed."""
         logger.info("Deleting category record id=%s", category_id)
         cursor = self._conn.execute(
             "DELETE FROM categories WHERE id = ?", (category_id,)

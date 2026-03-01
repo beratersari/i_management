@@ -16,8 +16,12 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class UserCreate(BaseModel):
+    """Payload for user registration requests."""
+
     email: EmailStr
-    username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    username: str = Field(
+        ..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$"
+    )
     full_name: Optional[str] = Field(None, max_length=100)
     password: str = Field(..., min_length=8, max_length=128)
     role: UserRole = UserRole.EMPLOYEE
@@ -25,6 +29,7 @@ class UserCreate(BaseModel):
     @field_validator("password")
     @classmethod
     def password_strength(cls, v: str) -> str:
+        """Enforce the minimum password strength rules."""
         logger.trace("Validating password strength")
         if not any(c.isupper() for c in v):
             logger.warning("Password missing uppercase letter")
@@ -36,6 +41,8 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    """Payload for updating user fields."""
+
     email: Optional[EmailStr] = None
     full_name: Optional[str] = Field(None, max_length=100)
     password: Optional[str] = Field(None, min_length=8, max_length=128)
@@ -48,6 +55,8 @@ class UserUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class UserResponse(BaseModel):
+    """Response model returned for user data."""
+
     id: int
     email: str
     username: str

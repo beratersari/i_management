@@ -19,26 +19,39 @@ class CartCreate(BaseModel):
 
 
 class CartUpdate(BaseModel):
-    desk_number: str | None = Field(None, min_length=1, max_length=20, description="Optional desk/table identifier for cafe orders")
+    """Payload for updating cart metadata."""
+
+    desk_number: str | None = Field(
+        None,
+        min_length=1,
+        max_length=20,
+        description="Optional desk/table identifier for cafe orders",
+    )
 
 
 class CartItemCreate(BaseModel):
+    """Payload for adding items to a cart."""
+
     item_id: int = Field(..., gt=0, description="ID of the item to add")
     quantity: Decimal = Field(..., gt=0, decimal_places=3)
 
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        """Coerce numeric inputs into Decimal values."""
         logger.trace("Coercing cart decimal value")
         return Decimal(str(v)) if v is not None else v
 
 
 class CartItemUpdate(BaseModel):
+    """Payload for updating quantities on cart items."""
+
     quantity: Decimal = Field(..., ge=0, decimal_places=3)
 
     @field_validator("quantity", mode="before")
     @classmethod
     def coerce_decimal(cls, v):
+        """Coerce numeric inputs into Decimal values."""
         logger.trace("Coercing cart decimal value")
         return Decimal(str(v)) if v is not None else v
 
@@ -48,6 +61,8 @@ class CartItemUpdate(BaseModel):
 # ---------------------------------------------------------------------------
 
 class CartItemTotals(BaseModel):
+    """Line-level totals for a cart item."""
+
     item_id: int
     name: str
     sku: str | None
@@ -62,6 +77,8 @@ class CartItemTotals(BaseModel):
 
 
 class CartTotals(BaseModel):
+    """Aggregate totals for a cart."""
+
     subtotal: Decimal
     discount_total: Decimal
     tax_total: Decimal
@@ -69,6 +86,8 @@ class CartTotals(BaseModel):
 
 
 class CartItemResponse(BaseModel):
+    """Response model for cart items."""
+
     id: int
     cart_id: int
     item_id: int
@@ -82,6 +101,8 @@ class CartItemResponse(BaseModel):
 
 
 class CartResponse(BaseModel):
+    """Response model for cart metadata."""
+
     id: int
     desk_number: str | None
     created_by: int
@@ -93,6 +114,8 @@ class CartResponse(BaseModel):
 
 
 class CartSummaryResponse(BaseModel):
+    """Response model that bundles cart items and totals."""
+
     cart: CartResponse
     items: list[CartItemTotals]
     totals: CartTotals

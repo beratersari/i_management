@@ -11,7 +11,7 @@ Time entry management endpoints:
 """
 from datetime import date
 from typing import Optional
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, Query, status
 import logging
 
 from backend.core.dependencies import (

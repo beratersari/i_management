@@ -14,7 +14,6 @@ from backend.repositories.item_repository import ItemRepository
 from backend.repositories.stock_repository import StockRepository
 from backend.repositories.user_repository import UserRepository
 from backend.repositories.cart_repository import CartRepository
-from backend.repositories.cart_item_repository import CartItemRepository
 from backend.repositories.menu_repository import MenuRepository
 
 logger = logging.getLogger(__name__)
@@ -93,16 +92,15 @@ def _generate_sku(category_name: str, item_name: str, index: int) -> str:
 
 
 def _generate_barcode(sku: str) -> str:
-    """Generate a fake barcode from SKU."""
+    """Generate a fake EAN-like barcode from the SKU."""
     logger.trace("Generating barcode for SKU=%s", sku)
-    # Generate a 13-digit EAN-like barcode
     digits = "".join(str(ord(c) % 10) for c in sku)
     return (digits * 2)[:13]
 
 
 def seed_mock_data() -> None:
     """
-    Create mock categories and items for testing.
+    Create mock categories, items, stock, carts, and menu items for testing.
     Uses the first available user as the creator (typically the admin).
     Safe to call multiple times – will skip already existing data.
     """
@@ -114,7 +112,6 @@ def seed_mock_data() -> None:
         item_repo = ItemRepository(conn)
         stock_repo = StockRepository(conn)
         cart_repo = CartRepository(conn)
-        cart_item_repo = CartItemRepository(conn)
         menu_repo = MenuRepository(conn)
 
         # Get the first user (admin) to use as creator
@@ -122,7 +119,7 @@ def seed_mock_data() -> None:
         if not users:
             logger.warning("Mock seeder: No users found. Skipping mock data creation.")
             return
-        
+
         creator_id = users[0].id
         logger.info("Mock seeder: Using user id=%s as creator", creator_id)
 
@@ -238,7 +235,7 @@ def seed_mock_data() -> None:
                     if not stock_entry or stock_entry.quantity <= 0:
                         continue
                     max_qty = max(1, int(min(5, stock_entry.quantity)))
-                    cart_item_repo.create(
+                    cart_repo.create_cart_item(
                         cart_id=cart.id,
                         item_id=item.id,
                         quantity=random.randint(1, max_qty),

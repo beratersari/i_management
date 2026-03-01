@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class ItemRepository:
+    """Data access layer for item records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing ItemRepository")
         self._conn = conn
 
@@ -22,6 +25,7 @@ class ItemRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, item_id: int) -> Optional[Item]:
+        """Return an item by id or None if missing."""
         logger.trace("Fetching item id=%s", item_id)
         row = self._conn.execute(
             "SELECT * FROM items WHERE id = ?", (item_id,)
@@ -29,6 +33,7 @@ class ItemRepository:
         return Item.from_row(row) if row else None
 
     def get_by_sku(self, sku: str) -> Optional[Item]:
+        """Return an item by SKU or None if missing."""
         logger.trace("Fetching item by sku=%s", sku)
         row = self._conn.execute(
             "SELECT * FROM items WHERE sku = ?", (sku,)
@@ -36,6 +41,7 @@ class ItemRepository:
         return Item.from_row(row) if row else None
 
     def list_all(self, category_id: Optional[int] = None) -> list[Item]:
+        """Return items, optionally filtered by category."""
         logger.trace("Listing items category_id=%s", category_id)
         if category_id:
             rows = self._conn.execute(
@@ -75,6 +81,7 @@ class ItemRepository:
         discount_rate: float,
         created_by: int,
     ) -> Item:
+        """Insert a new item row and return it."""
         logger.info("Creating item record name=%s", name)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
@@ -95,7 +102,7 @@ class ItemRepository:
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
     def update(self, item_id: int, **fields) -> Optional[Item]:
-        """Update arbitrary fields on an item."""
+        """Update item fields and return the updated row."""
         if not fields:
             logger.trace("No item fields to update id=%s", item_id)
             return self.get_by_id(item_id)
@@ -110,6 +117,7 @@ class ItemRepository:
         return self.get_by_id(item_id)
 
     def delete(self, item_id: int) -> bool:
+        """Delete an item by id and return True if removed."""
         logger.info("Deleting item record id=%s", item_id)
         cursor = self._conn.execute(
             "DELETE FROM items WHERE id = ?", (item_id,)

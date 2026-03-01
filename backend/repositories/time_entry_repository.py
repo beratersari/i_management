@@ -14,7 +14,10 @@ logger = logging.getLogger(__name__)
 
 
 class TimeEntryRepository:
+    """Data access layer for time entry records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing TimeEntryRepository")
         self._conn = conn
 
@@ -23,6 +26,7 @@ class TimeEntryRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, entry_id: int) -> Optional[TimeEntry]:
+        """Return a time entry by id or None if missing."""
         logger.trace("Fetching time entry id=%s", entry_id)
         row = self._conn.execute(
             "SELECT * FROM time_entries WHERE id = ?",
@@ -35,6 +39,7 @@ class TimeEntryRepository:
         employee_id: int, 
         status: Optional[TimeEntryStatus] = None
     ) -> list[TimeEntry]:
+        """Return time entries for an employee, optionally filtered by status."""
         logger.trace("Listing time entries employee_id=%s status=%s", employee_id, status)
         if status:
             rows = self._conn.execute(
@@ -62,6 +67,7 @@ class TimeEntryRepository:
         end_date: date,
         status: Optional[TimeEntryStatus] = None
     ) -> list[TimeEntry]:
+        """Return time entries in a date range, optionally filtered by status."""
         logger.trace("Listing time entries by date range")
         if status:
             rows = self._conn.execute(
@@ -97,6 +103,7 @@ class TimeEntryRepository:
         return [TimeEntry.from_row(row) for row in rows]
 
     def list_all(self, limit: int = 100) -> list[TimeEntry]:
+        """Return recent time entries limited by the provided count."""
         logger.trace("Listing all time entries limit=%s", limit)
         rows = self._conn.execute(
             "SELECT * FROM time_entries ORDER BY work_date DESC LIMIT ?",
@@ -118,6 +125,7 @@ class TimeEntryRepository:
         notes: Optional[str],
         created_by: int,
     ) -> TimeEntry:
+        """Insert a time entry row and return it."""
         logger.info("Creating time entry employee_id=%s", employee_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         cursor = self._conn.execute(
@@ -154,6 +162,7 @@ class TimeEntryRepository:
         notes: Optional[str],
         updated_by: int,
     ) -> Optional[TimeEntry]:
+        """Update time entry fields and return the updated row."""
         fields: dict = {}
         if work_date is not None:
             fields["work_date"] = work_date.isoformat()
@@ -187,6 +196,7 @@ class TimeEntryRepository:
         reviewed_by: int,
         rejection_reason: Optional[str] = None,
     ) -> Optional[TimeEntry]:
+        """Update a time entry review status and return the updated row."""
         logger.info("Reviewing time entry record id=%s", entry_id)
         now = datetime.now(tz=timezone.utc).isoformat()
         self._conn.execute(
@@ -201,6 +211,7 @@ class TimeEntryRepository:
         return self.get_by_id(entry_id)
 
     def delete(self, entry_id: int) -> bool:
+        """Delete a time entry by id and return True if removed."""
         logger.info("Deleting time entry record id=%s", entry_id)
         cursor = self._conn.execute(
             "DELETE FROM time_entries WHERE id = ?",

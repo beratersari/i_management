@@ -22,7 +22,10 @@ logger = logging.getLogger(__name__)
 
 
 class StockService:
+    """Business logic for stock management."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize repositories used by the stock service."""
         logger.trace("Initializing StockService")
         self._repo = StockRepository(conn)
         self._item_repo = ItemRepository(conn)
@@ -44,15 +47,12 @@ class StockService:
         return entry
 
     def list_entries(self) -> list[StockEntry]:
-        """Return all stock entries ordered by item_id."""
+        """Return all stock entries ordered by item id."""
         logger.info("Listing stock entries")
         return self._repo.list_all()
 
     def list_grouped_by_category(self) -> list[dict]:
-        """
-        Return stocked items grouped by category (sorted by item name within
-        each group).
-        """
+        """Return stocked items grouped by category."""
         logger.info("Listing stock grouped by category")
         return self._repo.list_grouped_by_category()
 
@@ -61,13 +61,7 @@ class StockService:
     # ------------------------------------------------------------------
 
     def add_to_stock(self, data: StockCreate, created_by: User) -> StockEntry:
-        """
-        Add an item to stock.
-
-        Raises:
-            404  – item does not exist.
-            409  – item is already in stock (duplicate item_id).
-        """
+        """Add an item to stock after validating existence and uniqueness."""
         logger.info("Adding item to stock item_id=%s", data.item_id)
         # Verify the item exists
         item = self._item_repo.get_by_id(data.item_id)
@@ -106,12 +100,7 @@ class StockService:
     def update_quantity(
         self, item_id: int, data: StockUpdate, updated_by: User
     ) -> StockEntry:
-        """
-        Update the quantity of an existing stock entry.
-
-        Raises:
-            404 – no stock entry found for the given item_id.
-        """
+        """Update the quantity for a stocked item after validation."""
         logger.info("Updating stock entry item_id=%s", item_id)
         # Ensure the entry exists (raises 404 if not)
         self.get_entry(item_id)
@@ -129,12 +118,7 @@ class StockService:
     # ------------------------------------------------------------------
 
     def remove_from_stock(self, item_id: int) -> None:
-        """
-        Remove an item from stock entirely.
-
-        Raises:
-            404 – no stock entry found for the given item_id.
-        """
+        """Remove a stock entry and raise 404 if missing."""
         logger.info("Removing stock entry item_id=%s", item_id)
         if not self._repo.delete(item_id):
             logger.warning("Stock entry not found for item id=%s", item_id)

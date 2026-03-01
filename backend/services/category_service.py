@@ -3,7 +3,6 @@ Category management service.
 Any authenticated user can create, update, and delete categories.
 """
 import sqlite3
-from typing import Optional
 import logging
 
 from fastapi import HTTPException, status
@@ -17,7 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 class CategoryService:
+    """Business logic for category operations."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Initialize the repository used for category operations."""
         logger.trace("Initializing CategoryService")
         self._repo = CategoryRepository(conn)
 
@@ -26,6 +28,7 @@ class CategoryService:
     # ------------------------------------------------------------------
 
     def get_category(self, category_id: int) -> Category:
+        """Fetch a category by id or raise a 404 HTTP exception."""
         logger.info("Fetching category id=%s", category_id)
         category = self._repo.get_by_id(category_id)
         if not category:
@@ -37,6 +40,7 @@ class CategoryService:
         return category
 
     def list_categories(self) -> list[Category]:
+        """Return all categories ordered by sort order and name."""
         logger.info("Listing categories")
         return self._repo.list_all()
 
@@ -45,6 +49,7 @@ class CategoryService:
     # ------------------------------------------------------------------
 
     def create_category(self, data: CategoryCreate, created_by: User) -> Category:
+        """Create a new category after verifying uniqueness."""
         # Check for duplicate name
         logger.info("Creating category %s", data.name)
         existing = self._repo.get_by_name(data.name)
@@ -70,6 +75,7 @@ class CategoryService:
     def update_category(
         self, category_id: int, data: CategoryUpdate, updated_by: User
     ) -> Category:
+        """Update a category after enforcing naming rules."""
         logger.info("Updating category id=%s", category_id)
         category = self.get_category(category_id)
 
@@ -98,6 +104,7 @@ class CategoryService:
     # ------------------------------------------------------------------
 
     def delete_category(self, category_id: int) -> None:
+        """Delete a category, raising on conflicts or missing rows."""
         logger.info("Deleting category id=%s", category_id)
         category = self.get_category(category_id)
         logger.trace("Deleting category id=%s name=%s", category_id, category.name)

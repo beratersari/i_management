@@ -23,6 +23,7 @@ configure_logging()
 
 
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI application instance."""
     logger = logging.getLogger(__name__)
     logger.info("Starting FastAPI application setup")
     app = FastAPI(
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     # ── Startup / shutdown events ───────────────────────────────────────────
     @app.on_event("startup")
     def on_startup() -> None:
+        """Initialize the database and development seed data."""
         logger.info("Initializing database and seed data")
         init_db()
         # ⚠️ DEV ONLY – remove these seeders before going to production

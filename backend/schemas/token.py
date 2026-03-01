@@ -20,6 +20,7 @@ class AccessToken(BaseModel):
 
 class TokenPayload(BaseModel):
     """JWT payload (claims) decoded from a token."""
+
     sub: Optional[str] = None   # user id as string
     role: Optional[str] = None
     type: Optional[str] = None  # "access" | "refresh"

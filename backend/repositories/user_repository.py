@@ -13,7 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class UserRepository:
+    """Data access layer for user records."""
+
     def __init__(self, conn: sqlite3.Connection) -> None:
+        """Store the database connection for query execution."""
         logger.trace("Initializing UserRepository")
         self._conn = conn
 
@@ -22,7 +25,7 @@ class UserRepository:
     # ------------------------------------------------------------------
 
     def get_by_id(self, user_id: int) -> Optional[User]:
-        """Return a user regardless of deleted status (used internally)."""
+        """Return a user by id or None if missing."""
         logger.trace("Fetching user by id=%s", user_id)
         row = self._conn.execute(
             "SELECT * FROM users WHERE id = ?", (user_id,)
@@ -54,7 +57,7 @@ class UserRepository:
         return User.from_row(row) if row else None
 
     def list_all(self, include_deleted: bool = False) -> list[User]:
-        """List users; by default only non-deleted users are returned."""
+        """Return users, optionally including soft-deleted accounts."""
         logger.trace("Listing users include_deleted=%s", include_deleted)
         if include_deleted:
             rows = self._conn.execute("SELECT * FROM users").fetchall()
@@ -76,6 +79,7 @@ class UserRepository:
         role: UserRole,
         full_name: Optional[str] = None,
     ) -> User:
+        """Insert a new user row and return the created user."""
         logger.info("Creating user record username=%s", username)
         cursor = self._conn.execute(
             """
@@ -87,10 +91,7 @@ class UserRepository:
         return self.get_by_id(cursor.lastrowid)  # type: ignore[return-value]
 
     def update(self, user_id: int, **fields) -> Optional[User]:
-        """
-        Update arbitrary columns on a user row.
-        Only non-None values in *fields* are applied.
-        """
+        """Update user fields and return the updated row."""
         if not fields:
             logger.trace("No user fields to update id=%s", user_id)
             return self.get_by_id(user_id)
