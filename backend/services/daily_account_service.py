@@ -6,6 +6,8 @@ import sqlite3
 from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 import logging
+from io import BytesIO
+from typing import Optional
 
 from fastapi import HTTPException, status
 
@@ -15,6 +17,8 @@ from backend.models.user import User
 from backend.repositories.cart_repository import CartRepository
 from backend.repositories.daily_account_repository import DailyAccountRepository
 from backend.repositories.item_repository import ItemRepository
+from backend.repositories.category_repository import CategoryRepository
+from backend.services.pdf_service import PDFService
 
 logger = logging.getLogger(__name__)
 
@@ -448,3 +452,127 @@ class DailyAccountService:
         """Quantize decimal values to two decimal places."""
         logger.trace("Quantizing decimal value")
         return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+    # ------------------------------------------------------------------
+    # Sales Charts Export
+    # ------------------------------------------------------------------
+
+    def export_sales_charts_pdf(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> BytesIO:
+        """
+        Export sales data as charts in a PDF report.
+        
+        Args:
+            start_date: Optional start date filter
+            end_date: Optional end date filter
+            
+        Returns:
+            BytesIO buffer containing the PDF
+        """
+        logger.info("Exporting sales charts PDF: start_date=%s, end_date=%s", start_date, end_date)
+        
+        # Get category sales data
+        category_sales = self._get_category_sales(start_date, end_date)
+        
+        # Get daily sales data
+        daily_sales = self._get_daily_sales(start_date, end_date)
+        
+        # Generate PDF
+        pdf_service = PDFService()
+        return pdf_service.generate_sales_charts_report(
+            category_sales=category_sales,
+            daily_sales=daily_sales,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def _get_category_sales(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        """Get sales data grouped by category."""
+        logger.trace("Getting category sales data")
+        
+        query = """
+            SELECT 
+                c.name as category_name,
+                SUM(dai.quantity) as total_quantity,
+                SUM(dai.unit_price * dai.quantity * (1 - dai.discount_rate/100.0) * (1 + dai.tax_rate/100.0)) as total_sales
+            FROM daily_account_items dai
+            JOIN daily_accounts da ON dai.account_id = da.id
+            JOIN items i ON dai.item_id = i.id
+            JOIN categories c ON i.category_id = c.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if start_date:
+            query += " AND da.account_date >= ?"
+            params.append(start_date.isoformat())
+        if end_date:
+            query += " AND da.account_date <= ?"
+            params.append(end_date.isoformat())
+        
+        query += """
+            GROUP BY c.id, c.name
+            ORDER BY total_sales DESC
+        """
+        
+        cursor = self._conn.execute(query, params)
+        rows = cursor.fetchall()
+        
+        return [
+            {
+                "category": row["category_name"],
+                "total_sales": float(row["total_sales"] or 0),
+                "item_count": int(row["total_quantity"] or 0),
+            }
+            for row in rows
+        ]
+
+    def _get_daily_sales(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+    ) -> list[dict]:
+        """Get daily sales totals."""
+        logger.trace("Getting daily sales data")
+        
+        query = """
+            SELECT 
+                da.account_date,
+                SUM(dai.unit_price * dai.quantity * (1 - dai.discount_rate/100.0) * (1 + dai.tax_rate/100.0)) as total_sales,
+                COUNT(DISTINCT dai.id) as transaction_count
+            FROM daily_account_items dai
+            JOIN daily_accounts da ON dai.account_id = da.id
+            WHERE 1=1
+        """
+        params = []
+        
+        if start_date:
+            query += " AND da.account_date >= ?"
+            params.append(start_date.isoformat())
+        if end_date:
+            query += " AND da.account_date <= ?"
+            params.append(end_date.isoformat())
+        
+        query += """
+            GROUP BY da.account_date
+            ORDER BY da.account_date ASC
+        """
+        
+        cursor = self._conn.execute(query, params)
+        rows = cursor.fetchall()
+        
+        return [
+            {
+                "date": date.fromisoformat(row["account_date"]),
+                "total_sales": float(row["total_sales"] or 0),
+                "transaction_count": int(row["transaction_count"] or 0),
+            }
+            for row in rows
+        ]

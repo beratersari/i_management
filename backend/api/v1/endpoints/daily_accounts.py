@@ -10,6 +10,7 @@ Daily account management endpoints:
   GET    /daily-accounts/analysis/item-sales – Get item sales by date range
   GET    /daily-accounts/analysis/top-sellers – Get top selling items
   GET    /daily-accounts/analysis/by-category – Get sales by category
+  GET    /daily-accounts/export/sales-charts – Export sales charts as PDF (optional date range)
 """
 from datetime import date
 from fastapi import APIRouter, Depends, Query, status
@@ -229,3 +230,41 @@ def get_sales_by_category(
     logger.info("Fetching sales by category start_date=%s end_date=%s", start_date, end_date)
     service = DailyAccountService(conn)
     return service.get_sales_by_category(start_date, end_date)
+
+
+@router.get(
+    "/export/sales-charts",
+    summary="Export sales charts as PDF",
+)
+def export_sales_charts_pdf(
+    start_date: date | None = Query(None, description="Start date (optional)"),
+    end_date: date | None = Query(None, description="End date (optional)"),
+    conn=Depends(db_dependency),
+    _: User = Depends(get_current_active_user),
+):
+    """
+    Export sales data as a PDF with bar chart (category sales) and line chart (daily sales trend).
+    
+    Date range parameters are optional. If not provided, all historical data will be included.
+    """
+    from fastapi.responses import StreamingResponse
+    
+    logger.info("Exporting sales charts PDF start_date=%s end_date=%s", start_date, end_date)
+    service = DailyAccountService(conn)
+    pdf_buffer = service.export_sales_charts_pdf(start_date=start_date, end_date=end_date)
+    
+    # Generate filename
+    if start_date and end_date:
+        filename = f"sales_charts_{start_date}_to_{end_date}.pdf"
+    elif start_date:
+        filename = f"sales_charts_from_{start_date}.pdf"
+    elif end_date:
+        filename = f"sales_charts_until_{end_date}.pdf"
+    else:
+        filename = "sales_charts_all_time.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

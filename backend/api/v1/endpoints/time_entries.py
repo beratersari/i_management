@@ -1,17 +1,20 @@
 """
 Time entry management endpoints:
-  POST   /time-entries                    – Create a new time entry (employees)
-  GET    /time-entries                    – List my time entries
-  GET    /time-entries/pending            – List pending entries (admin/market_owner)
-  GET    /time-entries/by-date-range      – List entries by date range
-  GET    /time-entries/{entry_id}         – Get a specific time entry
-  PATCH  /time-entries/{entry_id}         – Update own time entry
-  DELETE /time-entries/{entry_id}         – Delete own time entry
-  POST   /time-entries/{entry_id}/review  – Review entry (admin/market_owner)
+  POST   /time-entries                       – Create a new time entry (employees)
+  GET    /time-entries                       – List my time entries
+  GET    /time-entries/pending               – List pending entries (admin/market_owner)
+  GET    /time-entries/by-date-range         – List entries by date range
+  GET    /time-entries/grouped-by-employee   – List entries grouped by employee
+  GET    /time-entries/export-pdf            – Export working time as PDF
+  GET    /time-entries/{entry_id}            – Get a specific time entry
+  PATCH  /time-entries/{entry_id}            – Update own time entry
+  DELETE /time-entries/{entry_id}            – Delete own time entry
+  POST   /time-entries/{entry_id}/review     – Review entry (admin/market_owner)
 """
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, status
+from fastapi.responses import StreamingResponse
 import logging
 
 from backend.core.dependencies import (
@@ -26,6 +29,7 @@ from backend.schemas.time_entry import (
     TimeEntryUpdate,
     TimeEntryReview,
     TimeEntryResponse,
+    GroupedTimeEntriesResponse,
 )
 from backend.services.time_entry_service import TimeEntryService
 
@@ -115,6 +119,102 @@ def list_entries_by_date_range(
     )
     service = TimeEntryService(conn)
     return service.list_entries_by_date_range(start_date, end_date, status)
+
+
+@router.get(
+    "/grouped-by-employee",
+    response_model=GroupedTimeEntriesResponse,
+    summary="List time entries grouped by employee",
+)
+def list_entries_grouped_by_employee(
+    start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
+    status: Optional[TimeEntryStatus] = Query(
+        None, 
+        description="Filter by status: 'pending', 'accepted', or 'rejected'"
+    ),
+    conn=Depends(db_dependency),
+    _: User = Depends(require_admin_or_owner),
+):
+    """
+    Return time entries grouped by employee.
+    
+    Only admin or market_owner can access this endpoint.
+    
+    - **start_date**: Optional start date for the query (YYYY-MM-DD)
+    - **end_date**: Optional end date for the query (YYYY-MM-DD)
+    - **status**: Optional status filter (pending, accepted, rejected)
+    
+    Returns time entries grouped by employee with totals per employee.
+    """
+    logger.info(
+        "Listing time entries grouped by employee from %s to %s",
+        start_date,
+        end_date,
+    )
+    service = TimeEntryService(conn)
+    return service.list_grouped_by_employee(start_date, end_date, status)
+
+
+@router.get(
+    "/export-pdf",
+    summary="Export working time as PDF",
+    response_class=StreamingResponse,
+)
+def export_working_time_pdf(
+    start_date: Optional[date] = Query(None, description="Start date (YYYY-MM-DD)"),
+    end_date: Optional[date] = Query(None, description="End date (YYYY-MM-DD)"),
+    employee_id: Optional[int] = Query(
+        None, 
+        description="Optional employee ID to filter by specific employee"
+    ),
+    status: Optional[TimeEntryStatus] = Query(
+        None, 
+        description="Filter by status: 'pending', 'accepted', or 'rejected'. Defaults to 'accepted' if not provided."
+    ),
+    conn=Depends(db_dependency),
+    _: User = Depends(require_admin_or_owner),
+):
+    """
+    Export working time entries as a PDF document.
+    
+    Only admin or market_owner can access this endpoint.
+    
+    - **start_date**: Optional start date for the report (YYYY-MM-DD)
+    - **end_date**: Optional end date for the report (YYYY-MM-DD)
+    - **employee_id**: Optional employee ID to filter by specific employee.
+                      If not provided, all employees' entries will be included.
+    - **status**: Optional status filter. Defaults to 'accepted' if not provided.
+    
+    Returns a PDF file with working time entries for the specified period.
+    """
+    logger.info(
+        "Exporting working time PDF from %s to %s, employee_id=%s, status=%s",
+        start_date, end_date, employee_id, status
+    )
+    service = TimeEntryService(conn)
+    pdf_buffer = service.export_working_time_pdf(
+        start_date=start_date,
+        end_date=end_date,
+        employee_id=employee_id,
+        status_filter=status,
+    )
+    
+    # Generate filename
+    status_suffix = f"_{status.value}" if status else "_accepted"
+    date_suffix = f"_{start_date}_to_{end_date}" if start_date and end_date else "_all_dates"
+    if employee_id:
+        filename = f"working_time_employee_{employee_id}{status_suffix}{date_suffix}.pdf"
+    else:
+        filename = f"working_time_all_employees{status_suffix}{date_suffix}.pdf"
+    
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )
 
 
 @router.get(

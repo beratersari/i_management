@@ -31,6 +31,7 @@ class TimeEntry:
     updated_by: int
     created_at: datetime
     updated_at: datetime
+    end_date: Optional[date] = None  # For overnight shifts
 
     def __post_init__(self) -> None:
         """Log the creation of the TimeEntry model instance."""
@@ -47,10 +48,12 @@ class TimeEntry:
         logger = logging.getLogger(__name__)
         logger.trace("Hydrating TimeEntry from database row")
         reviewed_at_raw = row["reviewed_at"]
+        end_date_raw = row["end_date"] if "end_date" in row.keys() else None
         return cls(
             id=row["id"],
             employee_id=row["employee_id"],
             work_date=date.fromisoformat(row["work_date"]),
+            end_date=date.fromisoformat(end_date_raw) if end_date_raw else None,
             start_hour=time.fromisoformat(row["start_hour"]),
             end_hour=time.fromisoformat(row["end_hour"]),
             hours_worked=Decimal(str(row["hours_worked"])),

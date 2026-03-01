@@ -67,29 +67,65 @@ class TimeEntryRepository:
     @log_db_timing
     def list_by_date_range(
         self, 
-        start_date: date, 
-        end_date: date,
+        start_date: Optional[date] = None, 
+        end_date: Optional[date] = None,
         status: Optional[TimeEntryStatus] = None
     ) -> list[TimeEntry]:
         """Return time entries in a date range, optionally filtered by status."""
         logger.trace("Listing time entries by date range")
+        
+        query = "SELECT * FROM time_entries"
+        params = []
+        where_clauses = []
+        
+        if start_date:
+            where_clauses.append("work_date >= ?")
+            params.append(start_date.isoformat())
+        if end_date:
+            where_clauses.append("work_date <= ?")
+            params.append(end_date.isoformat())
+        if status:
+            where_clauses.append("status = ?")
+            params.append(status.value)
+            
+        if where_clauses:
+            query += " WHERE " + " AND ".join(where_clauses)
+            
+        query += " ORDER BY work_date DESC, employee_id"
+        
+        rows = self._conn.execute(query, params).fetchall()
+        return [TimeEntry.from_row(row) for row in rows]
+
+    @log_db_timing
+    def list_by_employee_and_date_range(
+        self,
+        employee_id: int,
+        start_date: date,
+        end_date: date,
+        status: Optional[TimeEntryStatus] = None
+    ) -> list[TimeEntry]:
+        """Return time entries for an employee within a date range."""
+        logger.trace(
+            "Listing time entries employee_id=%s from %s to %s",
+            employee_id, start_date, end_date
+        )
         if status:
             rows = self._conn.execute(
                 """
                 SELECT * FROM time_entries 
-                WHERE work_date >= ? AND work_date <= ? AND status = ?
-                ORDER BY work_date DESC, employee_id
+                WHERE employee_id = ? AND work_date >= ? AND work_date <= ? AND status = ?
+                ORDER BY work_date DESC, created_at DESC
                 """,
-                (start_date.isoformat(), end_date.isoformat(), status.value),
+                (employee_id, start_date.isoformat(), end_date.isoformat(), status.value),
             ).fetchall()
         else:
             rows = self._conn.execute(
                 """
                 SELECT * FROM time_entries 
-                WHERE work_date >= ? AND work_date <= ?
-                ORDER BY work_date DESC, employee_id
+                WHERE employee_id = ? AND work_date >= ? AND work_date <= ?
+                ORDER BY work_date DESC, created_at DESC
                 """,
-                (start_date.isoformat(), end_date.isoformat()),
+                (employee_id, start_date.isoformat(), end_date.isoformat()),
             ).fetchall()
         return [TimeEntry.from_row(row) for row in rows]
 
@@ -131,6 +167,7 @@ class TimeEntryRepository:
         hours_worked: Decimal,
         notes: Optional[str],
         created_by: int,
+        end_date: Optional[date] = None,
     ) -> TimeEntry:
         """Insert a time entry row and return it."""
         logger.info("Creating time entry employee_id=%s", employee_id)
@@ -138,14 +175,15 @@ class TimeEntryRepository:
         cursor = self._conn.execute(
             """
             INSERT INTO time_entries (
-                employee_id, work_date, start_hour, end_hour, hours_worked, notes,
+                employee_id, work_date, end_date, start_hour, end_hour, hours_worked, notes,
                 status, created_by, updated_by, created_at, updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 employee_id,
                 work_date.isoformat(),
+                end_date.isoformat() if end_date else None,
                 start_hour.isoformat(),
                 end_hour.isoformat(),
                 float(hours_worked),
@@ -169,11 +207,14 @@ class TimeEntryRepository:
         hours_worked: Optional[Decimal],
         notes: Optional[str],
         updated_by: int,
+        end_date: Optional[date] = None,
     ) -> Optional[TimeEntry]:
         """Update time entry fields and return the updated row."""
         fields: dict = {}
         if work_date is not None:
             fields["work_date"] = work_date.isoformat()
+        if end_date is not None:
+            fields["end_date"] = end_date.isoformat() if end_date else None
         if start_hour is not None:
             fields["start_hour"] = start_hour.isoformat()
         if end_hour is not None:

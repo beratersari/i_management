@@ -7,6 +7,7 @@ Mock data seeder – creates sample categories and items for testing.
 """
 import logging
 import random
+from datetime import date, timedelta, time
 
 from backend.db.database import get_connection
 from backend.repositories.category_repository import CategoryRepository
@@ -15,6 +16,10 @@ from backend.repositories.stock_repository import StockRepository
 from backend.repositories.user_repository import UserRepository
 from backend.repositories.cart_repository import CartRepository
 from backend.repositories.menu_repository import MenuRepository
+from backend.repositories.time_entry_repository import TimeEntryRepository
+from backend.models.time_entry import TimeEntryStatus
+from backend.models.user import UserRole
+from backend.core.security import hash_password
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +86,27 @@ MOCK_ITEMS = {
         {"name": "Granola Bar", "unit_type": "piece", "unit_price": 2.49, "tax_rate": 0},
     ],
 }
+
+# Mock employees for time entries
+MOCK_EMPLOYEES = [
+    {"username": "john_doe", "email": "john@example.com", "full_name": "John Doe", "password": "Employee123!"},
+    {"username": "jane_smith", "email": "jane@example.com", "full_name": "Jane Smith", "password": "Employee123!"},
+    {"username": "bob_wilson", "email": "bob@example.com", "full_name": "Bob Wilson", "password": "Employee123!"},
+]
+
+# Mock time entry patterns (start_hour, end_hour)
+MOCK_WORK_SHIFTS = [
+    (time(8, 0), time(16, 0)),    # Morning shift: 8:00 - 16:00 (8 hours)
+    (time(9, 0), time(17, 0)),    # Day shift: 9:00 - 17:00 (8 hours)
+    (time(10, 0), time(18, 0)),   # Mid shift: 10:00 - 18:00 (8 hours)
+    (time(14, 0), time(22, 0)),   # Afternoon shift: 14:00 - 22:00 (8 hours)
+    (time(22, 0), time(6, 0)),    # Night shift (Overnight): 22:00 - 6:00 (8 hours)
+    (time(23, 0), time(7, 0)),    # Night shift (Overnight): 23:00 - 7:00 (8 hours)
+    (time(7, 0), time(15, 0)),    # Early shift: 7:00 - 15:00 (8 hours)
+    (time(8, 0), time(12, 0)),    # Half day morning: 8:00 - 12:00 (4 hours)
+    (time(12, 0), time(16, 0)),   # Half day afternoon: 12:00 - 16:00 (4 hours)
+    (time(9, 0), time(13, 0)),    # Short morning: 9:00 - 13:00 (4 hours)
+]
 
 
 def _generate_sku(category_name: str, item_name: str, index: int) -> str:
@@ -242,6 +268,127 @@ def seed_mock_data() -> None:
                         created_by=creator_id,
                     )
             logger.info("Mock seeder: Added items to carts")
+
+        # ── Employees and Time Entries ───────────────────────────────────────
+        time_entry_repo = TimeEntryRepository(conn)
+        
+        # Create mock employees
+        employee_ids = []
+        for emp_data in MOCK_EMPLOYEES:
+            existing = user_repo.get_by_username(emp_data["username"])
+            if existing:
+                logger.info("Mock seeder: Employee '%s' already exists", emp_data["username"])
+                employee_ids.append(existing.id)
+                continue
+            
+            employee = user_repo.create(
+                email=emp_data["email"],
+                username=emp_data["username"],
+                full_name=emp_data["full_name"],
+                hashed_password=hash_password(emp_data["password"]),
+                role=UserRole.EMPLOYEE,
+            )
+            employee_ids.append(employee.id)
+            logger.info(
+                "Mock seeder: Created employee '%s' (id=%s)",
+                emp_data["username"], employee.id
+            )
+        
+        # Create time entries for the past 30 days
+        today = date.today()
+        time_entry_count = 0
+        
+        for emp_id in employee_ids:
+            # Each employee works random days in the past 30 days
+            # Skip weekends sometimes, not everyone works every day
+            for days_ago in range(30):
+                work_date = today - timedelta(days=days_ago)
+                
+                # Skip some days randomly (about 40% chance of working)
+                if random.random() > 0.6:
+                    continue
+                
+                # Check if entry already exists for this employee and date
+                existing_entries = time_entry_repo.list_by_employee_and_date_range(
+                    employee_id=emp_id,
+                    start_date=work_date,
+                    end_date=work_date,
+                )
+                if existing_entries:
+                    continue
+                
+                # Pick a random shift
+                start_hour, end_hour = random.choice(MOCK_WORK_SHIFTS)
+                
+                # Determine if this is an overnight shift
+                is_overnight = end_hour < start_hour
+                
+                # Calculate end_date for overnight shifts
+                if is_overnight:
+                    end_date = work_date + timedelta(days=1)
+                else:
+                    end_date = None
+                
+                # Calculate hours worked
+                start_minutes = start_hour.hour * 60 + start_hour.minute
+                end_minutes = end_hour.hour * 60 + end_hour.minute
+                if is_overnight:
+                    end_minutes += 24 * 60
+                hours_worked = (end_minutes - start_minutes) / 60
+                
+                # Random notes
+                notes_options = [
+                    None,
+                    "Regular shift",
+                    "Covered for colleague",
+                    "Training day",
+                    "Inventory day",
+                    "Busy day",
+                    "Short staffed",
+                    "Night shift" if is_overnight else None,
+                ]
+                notes = random.choice(notes_options)
+                
+                # Most entries should be accepted, some pending, few rejected
+                status_choice = random.choices(
+                    [TimeEntryStatus.ACCEPTED, TimeEntryStatus.PENDING, TimeEntryStatus.REJECTED],
+                    weights=[85, 10, 5],
+                    k=1
+                )[0]
+                
+                # Create the time entry
+                entry = time_entry_repo.create(
+                    employee_id=emp_id,
+                    work_date=work_date,
+                    end_date=end_date,
+                    start_hour=start_hour,
+                    end_hour=end_hour,
+                    hours_worked=hours_worked,
+                    notes=notes,
+                    created_by=emp_id,
+                )
+                
+                # If accepted or rejected, review it
+                if status_choice != TimeEntryStatus.PENDING:
+                    rejection_reason = None
+                    if status_choice == TimeEntryStatus.REJECTED:
+                        rejection_reason = random.choice([
+                            "Incorrect hours reported",
+                            "Missing break time",
+                            "Not scheduled for this day",
+                            "Please check with manager",
+                        ])
+                    
+                    time_entry_repo.review(
+                        entry_id=entry.id,
+                        status=status_choice,
+                        reviewed_by=creator_id,
+                        rejection_reason=rejection_reason,
+                    )
+                
+                time_entry_count += 1
+        
+        logger.info("Mock seeder: Created %s time entries", time_entry_count)
 
         conn.commit()
 

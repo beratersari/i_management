@@ -21,25 +21,17 @@ class TimeEntryCreate(BaseModel):
     """Payload for creating time entries."""
 
     work_date: date = Field(..., description="Date when the work was performed")
+    end_date: Optional[date] = Field(None, description="End date for overnight shifts (if different from work_date)")
     start_hour: time = Field(..., description="Start time of the work shift (e.g., '09:00')")
     end_hour: time = Field(..., description="End time of the work shift (e.g., '17:00')")
     notes: Optional[str] = Field(None, max_length=500, description="Optional notes about the work")
-
-    @field_validator("end_hour")
-    @classmethod
-    def end_after_start(cls, v, info):
-        """Ensure the end time is later than the start time."""
-        logger.trace("Validating end hour after start")
-        if "start_hour" in info.data and v <= info.data["start_hour"]:
-            logger.warning("End hour before start hour")
-            raise ValueError("End hour must be after start hour")
-        return v
 
 
 class TimeEntryUpdate(BaseModel):
     """Payload for updating time entries."""
 
     work_date: Optional[date] = Field(None, description="Date when the work was performed")
+    end_date: Optional[date] = Field(None, description="End date for overnight shifts")
     start_hour: Optional[time] = Field(None, description="Start time of the work shift")
     end_hour: Optional[time] = Field(None, description="End time of the work shift")
     notes: Optional[str] = Field(None, max_length=500, description="Optional notes about the work")
@@ -77,6 +69,7 @@ class TimeEntryResponse(BaseModel):
     id: int
     employee_id: int
     work_date: date
+    end_date: Optional[date]
     start_hour: time
     end_hour: time
     hours_worked: Decimal
@@ -91,3 +84,21 @@ class TimeEntryResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class EmployeeTimeEntries(BaseModel):
+    """Response model for time entries grouped by employee."""
+
+    employee_id: int
+    employee_name: str
+    entries: list[TimeEntryResponse]
+    total_hours: Decimal
+    entry_count: int
+
+
+class GroupedTimeEntriesResponse(BaseModel):
+    """Response model for all time entries grouped by employee."""
+
+    employees: list[EmployeeTimeEntries]
+    total_hours: Decimal
+    total_entries: int

@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     employee_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     work_date       TEXT    NOT NULL,
+    end_date        TEXT,
     start_hour      TEXT    NOT NULL,
     end_hour        TEXT    NOT NULL,
     hours_worked    REAL    NOT NULL DEFAULT 0.0,
@@ -204,6 +205,7 @@ MIGRATIONS = [
     ("menu_items", "allergens", "ALTER TABLE menu_items ADD COLUMN allergens TEXT"),
     ("carts", "desk_number", "ALTER TABLE carts ADD COLUMN desk_number TEXT"),
     ("carts", "status", "ALTER TABLE carts ADD COLUMN status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft', 'deleted', 'completed'))"),
+    ("time_entries", "end_date", "ALTER TABLE time_entries ADD COLUMN end_date TEXT"),
 ]
 
 # ---------------------------------------------------------------------------
