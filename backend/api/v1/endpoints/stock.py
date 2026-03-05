@@ -10,7 +10,11 @@ Stock management endpoints (any authenticated user can access):
 from fastapi import APIRouter, Depends, status
 import logging
 
-from backend.core.dependencies import db_dependency, get_current_active_user
+from backend.core.dependencies import (
+    db_dependency,
+    get_current_active_user,
+    require_admin_or_owner,
+)
 from backend.models.user import User
 from backend.schemas.stock import (
     StockCreate,
@@ -34,7 +38,7 @@ router = APIRouter(prefix="/stock", tags=["Stock"])
 def add_to_stock(
     data: StockCreate,
     conn=Depends(db_dependency),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(require_admin_or_owner),
 ):
     """
     Add a previously created item to stock with an initial quantity.
@@ -124,7 +128,7 @@ def update_stock(
 def remove_from_stock(
     item_id: int,
     conn=Depends(db_dependency),
-    _: User = Depends(get_current_active_user),
+    _: User = Depends(require_admin_or_owner),
 ):
     """Remove the stock entry for the given item entirely."""
     logger.info("Removing stock entry item_id=%s", item_id)

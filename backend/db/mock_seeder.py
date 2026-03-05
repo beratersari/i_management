@@ -92,6 +92,7 @@ MOCK_EMPLOYEES = [
     {"username": "john_doe", "email": "john@example.com", "full_name": "John Doe", "password": "Employee123!"},
     {"username": "jane_smith", "email": "jane@example.com", "full_name": "Jane Smith", "password": "Employee123!"},
     {"username": "bob_wilson", "email": "bob@example.com", "full_name": "Bob Wilson", "password": "Employee123!"},
+    {"username": "alice_wonder", "email": "alice@example.com", "full_name": "Alice Wonder", "password": "Employee123!"},
 ]
 
 # Mock time entry patterns (start_hour, end_hour)
@@ -257,6 +258,10 @@ def seed_mock_data() -> None:
                 if not available_items:
                     continue
                 for item in random.sample(available_items, k=min(3, len(available_items))):
+                    # Check if item is already in cart
+                    if cart_repo.get_cart_item_by_cart_and_item(cart.id, item.id):
+                        continue
+
                     stock_entry = stock_repo.get_by_item_id(item.id)
                     if not stock_entry or stock_entry.quantity <= 0:
                         continue

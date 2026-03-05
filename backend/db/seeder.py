@@ -25,41 +25,70 @@ ADMIN_EMAIL = "admin@stocktracker.local"
 ADMIN_PASSWORD = "Admin1234!"
 ADMIN_FULL_NAME = "Default Admin"
 
+MARKET_OWNER_USERNAME = "owner"
+MARKET_OWNER_EMAIL = "owner@stocktracker.local"
+MARKET_OWNER_PASSWORD = "Owner1234!"
+MARKET_OWNER_FULL_NAME = "Default Market Owner"
+
 
 def seed_admin() -> None:
     """
-    Insert the default admin user if it does not already exist.
+    Insert the default admin user and market owner if they do not already exist.
     Safe to call on every startup – it is a no-op when the user is present.
     """
-    logger.info("Seeder: ensuring default admin user")
+    logger.info("Seeder: ensuring default users")
     conn = get_connection()
     try:
-        existing = conn.execute(
+        # Seed Admin
+        existing_admin = conn.execute(
             "SELECT id FROM users WHERE username = ?", (ADMIN_USERNAME,)
         ).fetchone()
 
-        if existing:
-            logger.info("Seeder: admin user '%s' already exists – skipping.", ADMIN_USERNAME)
-            return
-
-        conn.execute(
-            """
-            INSERT INTO users (email, username, full_name, hashed_password, role, is_active, is_deleted)
-            VALUES (?, ?, ?, ?, ?, 1, 0)
-            """,
-            (
-                ADMIN_EMAIL,
+        if not existing_admin:
+            conn.execute(
+                """
+                INSERT INTO users (email, username, full_name, hashed_password, role, is_active, is_deleted)
+                VALUES (?, ?, ?, ?, ?, 1, 0)
+                """,
+                (
+                    ADMIN_EMAIL,
+                    ADMIN_USERNAME,
+                    ADMIN_FULL_NAME,
+                    hash_password(ADMIN_PASSWORD),
+                    UserRole.ADMIN.value,
+                ),
+            )
+            logger.info(
+                "Seeder: created default admin user '%s' (email: %s).",
                 ADMIN_USERNAME,
-                ADMIN_FULL_NAME,
-                hash_password(ADMIN_PASSWORD),
-                UserRole.ADMIN.value,
-            ),
-        )
+                ADMIN_EMAIL,
+            )
+        
+        # Seed Market Owner
+        existing_owner = conn.execute(
+            "SELECT id FROM users WHERE username = ?", (MARKET_OWNER_USERNAME,)
+        ).fetchone()
+
+        if not existing_owner:
+            conn.execute(
+                """
+                INSERT INTO users (email, username, full_name, hashed_password, role, is_active, is_deleted)
+                VALUES (?, ?, ?, ?, ?, 1, 0)
+                """,
+                (
+                    MARKET_OWNER_EMAIL,
+                    MARKET_OWNER_USERNAME,
+                    MARKET_OWNER_FULL_NAME,
+                    hash_password(MARKET_OWNER_PASSWORD),
+                    UserRole.MARKET_OWNER.value,
+                ),
+            )
+            logger.info(
+                "Seeder: created default market owner '%s' (email: %s).",
+                MARKET_OWNER_USERNAME,
+                MARKET_OWNER_EMAIL,
+            )
+
         conn.commit()
-        logger.info(
-            "Seeder: created default admin user '%s' (email: %s).",
-            ADMIN_USERNAME,
-            ADMIN_EMAIL,
-        )
     finally:
         conn.close()

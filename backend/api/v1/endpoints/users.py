@@ -51,20 +51,28 @@ def register_user(
 @router.get(
     "",
     response_model=list[UserResponse],
-    summary="List all users (Admin only)",
+    summary="List all users (Admin) or Employees (Market Owner)",
 )
 def list_users(
     include_deleted: bool = Query(False, description="Include soft-deleted users"),
     conn=Depends(db_dependency),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_or_owner),
 ):
     """
-    Return a list of every registered user. Restricted to **Admins**.
+    Return a list of users.
+    - **Admins**: See all users.
+    - **Market Owners**: See only employees.
     Pass `?include_deleted=true` to also see soft-deleted accounts.
     """
     logger.info("Listing users include_deleted=%s", include_deleted)
     service = UserService(conn)
-    return service.list_users(include_deleted=include_deleted)
+    users = service.list_users(include_deleted=include_deleted)
+    
+    if current_user.role == UserRole.MARKET_OWNER:
+        # Filter for employees only
+        return [u for u in users if u.role == UserRole.EMPLOYEE]
+        
+    return users
 
 
 @router.get(

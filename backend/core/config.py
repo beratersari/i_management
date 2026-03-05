@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./backend/stock_tracker.db"
 
     # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000", "http://localhost:8081"]
 
     # Logging
     LOG_LEVEL: str = "INFO"
